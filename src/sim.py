@@ -1,22 +1,61 @@
 from stats import Stats, Attributes
+from home_building import HomeBuilding
+import uuid
+import math
+from services import TownHall
 
 
 class Sim:
     
-    def __init__(self, *args, attributes=None):
-        self.attributes = attributes or Attributes(health=(10,10), stamina=(10,10), hunger=(0,10))
+    def __init__(self, *args, name:str=None, attributes:Attributes=None):
+        self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
+        self.name = name or uuid.uuid4()  # maybe not a nice name but we will see
+        
         self.alive = True
         
         self.home = None
         self.workplace = None
         self.current_location = None
     
+    def money(self):
+        return self.attributes.money
+    
     def check(self):
-        if self.attributes.hunger >= self.attributes.max_hunger+1:
+        if self.attributes.hunger >= self.attributes.max_hunger + 1:
             self.alive = False
             
-    def enter_building(self, building):
+    def enter_building(self, building:HomeBuilding):
         self.attributes + building.cost()
         
-    def leave_building(self, building):
+    def leave_building(self, building:HomeBuilding):
         self.attributes + building.gain()
+    
+    def find_place_to_live(self, town_hall:TownHall):
+        buildings = town_hall.list_of_buildings()
+        
+        for building in buildings:
+            # print(home_building.name, home_building.quality(), home_building.cost())
+            if self.money() >= abs(building.cost()):
+                unit = building.get_free_unit()
+                if unit.claim(self):
+                    self.home = unit
+                    break
+                
+    def go(self, location):
+        if location:
+            return location.enter(self)
+        
+    def __repr__(self):
+        return f"{self.name}: {self.home} ({self.attributes})"
+
+
+def main():
+    sim = Sim(name="Minimus")
+    mega_sim = Sim(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
+    
+    print(sim, sim.money())
+    print(mega_sim, mega_sim.money())
+            
+        
+if __name__ == "__main__":
+    main()

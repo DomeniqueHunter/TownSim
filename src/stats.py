@@ -3,6 +3,7 @@ import math
 class Stats:
     """
     Stats will be added/removed to/from the Attributes
+    Attribute modification
     """
     
     attrs = ['health', 'stamina', 'hunger', 'money']
@@ -12,6 +13,9 @@ class Stats:
         self.stamina = stamina
         self.hunger = hunger
         self.money = money
+        
+    def __int__(self):
+        return self.health + self.stamina + self.hunger + self.money
 
 
 class Attributes:
@@ -21,18 +25,18 @@ class Attributes:
     init describes the start,max values of the char
     """
 
-    def __init__(self, *args, health:tuple=None, stamina:tuple=None, hunger:tuple=None, money:int=0):
+    def __init__(self, *args, health:tuple=None, stamina:tuple=None, hunger:tuple=None, money:int|float=0):
         self.health, self.max_health = health or (10, 10)
         self.stamina, self.max_stamina = stamina or (10, 10)
         self.hunger, self.max_hunger = hunger or (0, 10)
         self.money, self.max_money = money, math.inf
         
-    def __add__(self, other):
+    def __add__(self, other:Stats):
         if type(other) == Stats:
             for attr in Stats.attrs:
                 self.__dict__[attr] = self.__dict__[attr]+other.__dict__[attr] if self.__dict__[attr]+other.__dict__[attr] < self.__dict__['max_'+attr] else self.__dict__['max_'+attr]
                 
-        return  self            
+        return self            
             
     def __repr__(self):
         stats_string = ""
