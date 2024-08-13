@@ -1,4 +1,4 @@
-Small Town Simmulation
+# Small Town Simmulation
 
 Create Model for a small town. The Town contains up to 10_000 People.
 
