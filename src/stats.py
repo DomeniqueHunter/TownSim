@@ -1,5 +1,6 @@
 import math
 
+
 class Stats:
     """
     Stats will be added/removed to/from the Attributes
@@ -16,6 +17,18 @@ class Stats:
         
     def __int__(self):
         return self.health + self.stamina + self.hunger + self.money
+    
+    def __add__(self, other):
+        if type(other) == Stats:
+            self.health += other.health
+            self.stamina += other.stamina
+            self.hunger += other.hunger
+            self.money += other.money
+        
+        return self
+    
+    def __str__(self):
+        return f"{self.health} {self.stamina} {self.hunger} {self.money}"
 
 
 class Attributes:
@@ -25,7 +38,7 @@ class Attributes:
     init describes the start,max values of the char
     """
 
-    def __init__(self, *args, health:tuple=None, stamina:tuple=None, hunger:tuple=None, money:int|float=0):
+    def __init__(self, *args, health:tuple=None, stamina:tuple=None, hunger:tuple=None, money:int | float=0):
         self.health, self.max_health = health or (10, 10)
         self.stamina, self.max_stamina = stamina or (10, 10)
         self.hunger, self.max_hunger = hunger or (0, 10)
@@ -34,7 +47,9 @@ class Attributes:
     def __add__(self, other:Stats):
         if type(other) == Stats:
             for attr in Stats.attrs:
-                self.__dict__[attr] = self.__dict__[attr]+other.__dict__[attr] if self.__dict__[attr]+other.__dict__[attr] < self.__dict__['max_'+attr] else self.__dict__['max_'+attr]
+                self.__dict__[attr] = self.__dict__[attr] + other.__dict__[attr] if self.__dict__[attr] + other.__dict__[attr] < self.__dict__['max_' + attr] else self.__dict__['max_' + attr]
+                if self.__dict__[attr] < 0:
+                    self.__dict__[attr] = 0
                 
         return self            
             
@@ -49,7 +64,9 @@ def test():
     attr = Attributes(health=(10, 100))
     st = Stats(health=100, money=100_000_000)
     st2 = Stats(health=-20, money=100_000)
-    print(attr)    
+    print(attr) 
+    
+    print('stats:', st + st2)   
     
     attr + st
     

@@ -23,6 +23,9 @@ class Unit:
             return True
         return False
     
+    def location_stats(self):
+        return self.building.gain_stats + self.building.cost_stats
+    
     def enter(self, sim):
         if sim not in self.currently_here:
             self.currently_here.append(sim)
@@ -92,7 +95,7 @@ class Mansion(HomeBuilding):
 
     
 def test():
-    attr = Attributes(health=(50, 100), money=5)
+    attr = Attributes(health=(0, 10), money=0)
     print(attr)
     
     mb = MegaBuilding()
@@ -102,6 +105,8 @@ def test():
     
     mansion = Mansion("Mansion Maxima")
     print(mansion)
+    unit = mansion.get_unit(0)
+    print(unit, unit.location_stats())
     
     
 if __name__ == "__main__":

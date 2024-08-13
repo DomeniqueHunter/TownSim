@@ -21,14 +21,19 @@ class Sim:
         return self.attributes.money
     
     def check(self):
-        if self.attributes.hunger >= self.attributes.max_hunger + 1:
+        if self.attributes.hunger == self.attributes.max_hunger:
             self.alive = False
+        return self.alive
             
-    def enter_building(self, building:HomeBuilding):
-        self.attributes + building.cost()
-        
-    def leave_building(self, building:HomeBuilding):
-        self.attributes + building.gain()
+    # def enter_building(self, building:HomeBuilding):
+    #     self.attributes + building.cost()
+    #
+    # def leave_building(self, building:HomeBuilding):
+    #     self.attributes + building.gain()
+    
+    def apply_location(self):
+        if self.current_location:
+            self.attributes += self.current_location.location_stats()
     
     def find_place_to_live(self, town_hall:TownHall):
         buildings = town_hall.list_of_buildings()
