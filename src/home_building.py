@@ -33,6 +33,9 @@ class Unit:
             return True 
         return False
     
+    def residents(self):
+        return len(self.owners)
+    
     def __repr__(self):
         return f"{self.building.name}-{self.unit_number}"
 
@@ -45,6 +48,8 @@ class HomeBuilding:
         self.cost_stats = Stats()
         self.units = {}
         self.sims_per_unit = sims_per_unit
+        
+        self.max_residents = len(self.units) * sims_per_unit
         
         for nr in range(stories * units_per_strory):
             self.units[nr] = Unit(self, nr, self.sims_per_unit)
@@ -73,7 +78,10 @@ class HomeBuilding:
         return None
     
     def __repr__(self):
-        return f"{self.name}: {self.quality()}/{self.gain()}/{self.cost()}"
+        return f"{self.name}: residents: {self.residents()} [{self.quality()}/{self.gain()}/{self.cost()}]"
+    
+    def residents(self):
+        return sum([unit.residents() for unit in self.units.values()])
 
 
 class MegaBuilding(HomeBuilding):

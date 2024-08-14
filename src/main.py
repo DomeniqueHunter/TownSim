@@ -8,8 +8,11 @@ from home_building import MegaBuilding, Mansion
 def main():
     town_hall = TownHall("Small Ville")
     
-    minimus = Sim(name="Minimus")
+    minimus = Sim(name="Minimus", attributes=Attributes(money=100))
     maxima = Sim(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
+    
+    for _ in range(1000):
+        town_hall.add_citizen(Sim())
     
     town_hall.add_citizen(minimus)
     town_hall.add_citizen(maxima)
@@ -55,6 +58,10 @@ def main():
             
     print(maxima, maxima.current_location)
     print(minimus, minimus.current_location)
+    
+    print(mansion)
+    print(mb)
+    print(poverty_building)
 
 
 if __name__ == "__main__":
