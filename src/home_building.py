@@ -33,6 +33,12 @@ class Unit:
             return True 
         return False
     
+    def leave(self, sim):
+        if sim in self.currently_here:
+            self.currently_here.remove(sim)
+            return True
+        return False
+    
     def residents(self):
         return len(self.owners)
     

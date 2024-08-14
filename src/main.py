@@ -54,7 +54,7 @@ def main():
             
             # check if citizen is alive
             if not citizen.check():
-                print(f"citizen: {citizen.name} died")
+                citizen.die()
             
     print(maxima, maxima.current_location)
     print(minimus, minimus.current_location)

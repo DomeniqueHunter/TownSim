@@ -25,11 +25,11 @@ class Sim:
             self.alive = False
         return self.alive
             
-    # def enter_building(self, building:HomeBuilding):
-    #     self.attributes + building.cost()
-    #
-    # def leave_building(self, building:HomeBuilding):
-    #     self.attributes + building.gain()
+    def die(self):
+        print(f"sim: {self.name} died")
+        self.current_location.leave(self)
+        self.home.owners.remove(self)
+        self.home = None
     
     def apply_location(self):
         if self.current_location:
