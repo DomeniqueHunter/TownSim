@@ -35,15 +35,15 @@ class Sim:
     def money(self):
         return self.attributes.money
     
-    def check(self):
+    def check(self, verbose=False):
         if self.attributes.hunger == self.attributes.max_hunger:
             self.alive = False
-            self.die()
+            self.die(verbose=verbose)
             
         return self.alive
             
-    def die(self):
-        print(f"sim: {self.name} died")
+    def die(self, verbose=False):
+        if verbose: print(f"sim: {self.name} died")
         if self.current_location:
             self.current_location.leave(self)
         
