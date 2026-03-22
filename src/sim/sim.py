@@ -29,9 +29,12 @@ class Sim:
             
     def die(self):
         print(f"sim: {self.name} died")
-        self.current_location.leave(self)
-        self.home.owners.remove(self)
-        self.home = None
+        if self.current_location:
+            self.current_location.leave(self)
+        
+        if self.home:
+            self.home.owners.remove(self)
+            self.home = None
     
     def apply_location(self):
         if self.current_location:
