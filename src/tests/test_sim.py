@@ -13,11 +13,21 @@ class TestSim(unittest.TestCase):
 
         for _ in range(10):
             if not sim.alive: continue
-            
-            sim.attributes += round_malus            
+
+            sim.attributes += round_malus
             sim.check()
 
         self.assertEqual(sim.alive, False)
+
+    def test_interactions(self):
+        sim1 = Sim(name="Sim1")
+
+        sim1.home = "Home1"
+        sim1.workplace = "Workplace1"
+
+        # meeting at else location
+        sim1.current_location = "Else"
+        print(sim1.interactions())
 
 
 if __name__ == "__main__":

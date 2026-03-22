@@ -1,5 +1,5 @@
 from services import TownHall
-from sim import Sim
+from sim import Sim, maxima
 from stats import Attributes, Stats
 import math
 from buildings import MegaBuilding, Mansion
@@ -9,7 +9,7 @@ def main():
     town_hall = TownHall("Small Ville")
     
     minimus = Sim(name="Minimus", attributes=Attributes(money=100))
-    maxima = Sim(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
+    # maxima = Sim(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
     
     for _ in range(1000):
         town_hall.add_citizen(Sim())
@@ -53,9 +53,8 @@ def main():
             citizen.attributes += round_malus
             
             # check if citizen is alive
-            if not citizen.check():
-                citizen.die()
-                print(f"{citizen.name} died!")
+            citizen.check()
+
             
     print(maxima, maxima.current_location)
     print(minimus, minimus.current_location)

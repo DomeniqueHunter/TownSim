@@ -1,5 +1,30 @@
 # Small Town Simmulation
 
+## Project Tree
+
+TownSim
+├── idea.md
+├── README.md
+├── src
+│   ├── buildings
+│   │   ├── home_building.py
+│   │   ├── __init__.py
+│   │   ├── mansion.py
+│   │   ├── mega_building.py
+│   │   └── unit.py
+│   ├── main.py
+│   ├── services.py
+│   ├── sim
+│   │   ├── __init__.py
+│   │   └── sim.py
+│   ├── stats.py
+│   └── tests
+│       ├── test_buildings.py
+│       └── test_sim.py
+└── venv
+
+
+## Rules
 Create Model for a small town. The Town contains up to 10_000 People.
 
 People live in homes go to work, have free time and they need to sleep and eat.

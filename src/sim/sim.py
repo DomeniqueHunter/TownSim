@@ -16,6 +16,21 @@ class Sim:
         self.home = None
         self.workplace = None
         self.current_location = None
+        
+    def interactions(self) -> list["str"]:
+        possible_interactions = ["give"]
+        
+        if self.current_location == self.home:
+            possible_interactions += ["fuck"]
+        elif self.current_location == self.workplace:
+            possible_interactions += ["work"]
+        else:
+            possible_interactions += ["goto"]
+        
+        return possible_interactions
+    
+    def interact_with(self, other:"Sim"):
+        pass
     
     def money(self):
         return self.attributes.money
