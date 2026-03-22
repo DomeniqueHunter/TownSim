@@ -1,5 +1,5 @@
 from stats import Stats, Attributes
-from home_building import HomeBuilding
+
 import uuid
 import math
 from services import TownHall
@@ -23,6 +23,8 @@ class Sim:
     def check(self):
         if self.attributes.hunger == self.attributes.max_hunger:
             self.alive = False
+            self.die()
+            
         return self.alive
             
     def die(self):

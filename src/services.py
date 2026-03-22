@@ -1,4 +1,4 @@
-from home_building import HomeBuilding
+from buildings import HomeBuilding
 
 
 class TownHall:

@@ -2,7 +2,7 @@ from services import TownHall
 from sim import Sim
 from stats import Attributes, Stats
 import math
-from home_building import MegaBuilding, Mansion
+from buildings import MegaBuilding, Mansion
 
 
 def main():
