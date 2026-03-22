@@ -1,9 +1,9 @@
 
-from .sim import Sim
+from .person import Person
 from .maxima import maxima
 
 
 __all__ = [
-       "Sim",
+       "Person",
        "maxima",
     ]

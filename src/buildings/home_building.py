@@ -6,17 +6,17 @@ import uuid
 
 class HomeBuilding:
 
-    def __init__(self, building_name=None, stories=1, units_per_strory=1, sims_per_unit=2):
+    def __init__(self, building_name=None, stories=1, units_per_strory=1, persons_per_unit=2):
         self.name = building_name or str(uuid.uuid4()).replace('-', '')
         self.gain_stats = Stats()
         self.cost_stats = Stats()
         self.units = {}
-        self.sims_per_unit = sims_per_unit
+        self.persons_per_unit = persons_per_unit
 
-        self.max_residents = len(self.units) * sims_per_unit
+        self.max_residents = len(self.units) * persons_per_unit
 
         for nr in range(stories * units_per_strory):
-            self.units[nr] = Unit(self, nr, self.sims_per_unit)
+            self.units[nr] = Unit(self, nr, self.persons_per_unit)
 
     def gain(self):
         return int(self.gain_stats)
@@ -25,7 +25,7 @@ class HomeBuilding:
         return int(self.cost_stats)
 
     def quality(self):
-        return self.gain_stats.health + self.gain_stats.stamina + self.gain_stats.hunger - (self.sims_per_unit - 1)
+        return self.gain_stats.health + self.gain_stats.stamina + self.gain_stats.hunger - (self.persons_per_unit - 1)
 
     def get_free_unit(self) -> Unit:
         """

@@ -2,6 +2,7 @@
 
 ## Project Tree
 
+```
 TownSim
 ├── idea.md
 ├── README.md
@@ -13,16 +14,29 @@ TownSim
 │   │   ├── mega_building.py
 │   │   └── unit.py
 │   ├── main.py
-│   ├── services.py
-│   ├── sim
+│   ├── person
 │   │   ├── __init__.py
-│   │   └── sim.py
+│   │   ├── maxima.py
+│   │   └── person.py
+│   ├── services
+│   │   ├── __init__.py
+│   │   └── townhall.py
 │   ├── stats.py
 │   └── tests
 │       ├── test_buildings.py
-│       └── test_sim.py
+│       └── test_person.py
 └── venv
+```
 
+### Person(Sim)
+A person is called a Sim, like in the Sims.
+
+### Buildings
+Defines the buildings we need
+
+### Services
+Contains leisure and work spaces.   
+Sims can work at a bar for example and also enjoy it in the free time.
 
 ## Rules
 Create Model for a small town. The Town contains up to 10_000 People.
@@ -61,7 +75,7 @@ The Food will be stored in the persons inventory.
 The Person can consume the food at home.
 
 A Workplace has workers.
-Workers will receive money each day for working: boss: 100m, office: 50, worker: 25m
+Workers will receive money each day for working: boss: 100m, office: 50m, worker: 25m
 
 Workers know what shift they work on.
 

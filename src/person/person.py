@@ -5,7 +5,7 @@ import math
 from services import TownHall
 
 
-class Sim:
+class Person:
     
     def __init__(self, *args, name:str=None, attributes:Attributes=None):
         self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
@@ -29,7 +29,7 @@ class Sim:
         
         return possible_interactions
     
-    def interact_with(self, other:"Sim"):
+    def interact_with(self, other:"Person"):
         pass
     
     def money(self):
@@ -75,11 +75,11 @@ class Sim:
 
 
 def main():
-    sim = Sim(name="Minimus")
-    mega_sim = Sim(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
+    person = Person(name="Minimus")
+    mega_person = Person(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
     
-    print(sim, sim.money())
-    print(mega_sim, mega_sim.money())
+    print(person, person.money())
+    print(mega_person, mega_person.money())
             
         
 if __name__ == "__main__":
