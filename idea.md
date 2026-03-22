@@ -1,7 +1,6 @@
 # Small Town Simmulation
 
 ## Project Tree
-
 ```
 TownSim
 ├── idea.md

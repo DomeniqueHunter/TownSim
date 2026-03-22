@@ -8,6 +8,7 @@ class HomeBuilding:
 
     def __init__(self, building_name=None, stories=1, units_per_strory=1, persons_per_unit=2):
         self.name = building_name or str(uuid.uuid4()).replace('-', '')
+        self.address = ""   # set by TownHall
         self.gain_stats = Stats()
         self.cost_stats = Stats()
         self.units = {}
