@@ -2,7 +2,6 @@ from stats import Stats, Attributes
 
 import uuid
 import math
-from services import TownHall
 
 
 class Person:
@@ -55,8 +54,8 @@ class Person:
         if self.current_location:
             self.attributes += self.current_location.location_stats()
     
-    def find_place_to_live(self, town_hall:TownHall):
-        buildings = town_hall.list_of_buildings()
+    def find_place_to_live(self, buildings:list):
+        # buildings = town_hall.list_of_buildings()
         
         for building in buildings:
             # print(home_building.name, home_building.quality(), home_building.cost())

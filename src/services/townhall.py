@@ -33,8 +33,8 @@ class TownHall:
             if isinstance(building, HomeBuilding):
                 self.home_buildings.append(building)
 
-            if isinstance(building, WorkBuilding):
-                self.work_buildings.append(building)
+            # if isinstance(building, WorkBuilding):
+            #     self.work_buildings.append(building)
 
             # TODO leisure
             # if isinstance(building, LeisureBuilding):

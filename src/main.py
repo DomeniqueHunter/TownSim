@@ -28,7 +28,7 @@ def main():
     print(town_hall)
     
     for person in town_hall.citizens:
-        person.find_place_to_live(town_hall)
+        person.find_place_to_live(town_hall.list_of_buildings())
         person.go(person.home)
     
     print()
