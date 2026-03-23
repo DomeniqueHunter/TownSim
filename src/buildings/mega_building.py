@@ -10,3 +10,6 @@ class MegaBuilding(HomeBuilding):
         
         self.gain_stats = Stats(health=health, stamina=stamina, hunger=hunger)
         self.cost_stats = Stats(money=money)
+        
+    def __str__(self) -> str:
+        return "MB"

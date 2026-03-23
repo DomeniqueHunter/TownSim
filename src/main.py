@@ -1,8 +1,7 @@
 from services import TownHall
 from person import Person, maxima
 from stats import Attributes, Stats
-import math
-from buildings import MegaBuilding, Mansion
+from buildings import MegaBuilding, Mansion, Tile
 
 
 def main():
@@ -18,12 +17,17 @@ def main():
     town_hall.add_citizen(maxima)
     
     poverty_building = MegaBuilding("Mega Poverty 1", stories=100, persons_per_unit=10, health=1, stamina=2, hunger=0, money=0)
-    mb = MegaBuilding("Mega Block 1", stories=15, persons_per_unit=3, health=2, stamina=3, money=2)
+    mb = MegaBuilding("Mega Block 1", stories=15, persons_per_unit=3, health=2, stamina=3, money=2)    
     mansion = Mansion("Villa Maxima", health=5, stamina=10, hunger=-3)
     
     town_hall.add_building(poverty_building)
     town_hall.add_building(mb)
-    town_hall.add_building(mansion)
+    town_hall.add_building(mansion, (5,5))
+    
+    town_hall.add_building(Tile("Grass Land", "GL"), (-5,-5))
+    town_hall.add_building(Tile("Grass Land", "GL"), (-10,-10))
+    town_hall.add_building(Tile("Grass Land", "GL"), (10,10))
+    town_hall.add_building(Tile("Grass Land", "GL"), (10,0))
     
     print(town_hall)
     
@@ -62,6 +66,9 @@ def main():
     print(mansion)
     print(mb)
     print(poverty_building)
+    
+    print(town_hall.town_grid.grid)
+    town_hall.town_grid.show()
 
 
 if __name__ == "__main__":

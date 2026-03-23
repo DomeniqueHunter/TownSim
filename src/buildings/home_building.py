@@ -1,12 +1,15 @@
 
 from stats import Stats
-from buildings.unit import Unit
+from buildings import Building
+from buildings import Unit
+
 import uuid
 
 
-class HomeBuilding:
+class HomeBuilding(Building):
 
     def __init__(self, building_name=None, stories=1, units_per_strory=1, persons_per_unit=2):
+        Building.__init__(self)
         self.name = building_name or str(uuid.uuid4()).replace('-', '')
         self.address = ""   # set by TownHall
         self.gain_stats = Stats()
@@ -41,6 +44,9 @@ class HomeBuilding:
         if nr in self.units:
             return self.units[nr]
         return None
+    
+    def __str__(self)->str:
+        return "HB"
 
     def __repr__(self):
         return f"{self.name}: residents: {self.residents()} [{self.quality()}/{self.gain()}/{self.cost()}]"
