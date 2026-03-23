@@ -59,14 +59,27 @@ class Attributes:
             self.__dict__[f"max_{attr}"] = max_val
 
 
-    def __add__(self, other:Stats):
-        if type(other) == Stats:
+    def __add__(self, other: Stats):
+        if isinstance(other, Stats):
             for attr in Stats.attrs:
-                self.__dict__[attr] = self.__dict__[attr] + other.__dict__[attr] if self.__dict__[attr] + other.__dict__[attr] < self.__dict__['max_' + attr] else self.__dict__['max_' + attr]
-                if self.__dict__[attr] < 0:
-                    self.__dict__[attr] = 0
-                
-        return self  
+                # skip if attribute does not exist in other
+                if not hasattr(other, attr):
+                    continue
+    
+                current_value = getattr(self, attr)
+                other_value = getattr(other, attr)
+                max_value = getattr(self, f"max_{attr}")
+    
+                new_value = current_value + other_value
+    
+                if new_value > max_value:
+                    new_value = max_value
+                elif new_value < 0:
+                    new_value = 0
+    
+                setattr(self, attr, new_value)
+    
+        return self
 
     def __repr__(self):
         return " ".join(
