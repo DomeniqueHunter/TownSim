@@ -10,8 +10,13 @@ class Stats:
     # attribute: value
     attrs = {'health': 0, 'stamina': 0, 'hunger': 0, 'money': 0}
 
-    def __init__(self, attributes:dict=attrs):
-        for attr, value in attributes.items():
+    def __init__(self, attributes:dict=None, **kwargs):
+        if attributes is not None:
+            _attributes = attributes        
+        else:
+            _attributes = dict(kwargs)        
+        
+        for attr, value in _attributes.items():
             self.__dict__[attr] = value
         
     def __int__(self):
@@ -42,41 +47,26 @@ class Attributes:
         'hunger': (0, 10),
         'money': (0, math.inf),
     }
+    
+    def __init__(self, attributes:dict=None, **kwargs):
+        if attributes is not None:
+            _attributes = attributes        
+        else:
+            _attributes = dict(kwargs)
+        
+        for attr, (current_val, max_val) in _attributes.items():
+            self.__dict__[attr] = current_val
+            self.__dict__[f"max_{attr}"] = max_val
 
-    def __init__(self, **kwargs):
-        for attr, (min_val, max_val) in self.attrs.items():
-            if attr in kwargs:
-                value = kwargs[attr]
 
-                # allow tuple (current, max) or single value
-                if isinstance(value, tuple):
-                    current, max_override = value
-                    self.__dict__[attr] = current
-                    self.__dict__[f"max_{attr}"] = max_override
-                else:
-                    self.__dict__[attr] = value
-                    self.__dict__[f"max_{attr}"] = max_val
-            else:
-                # default: start at max except hunger-style cases
-                default_current = min_val if min_val == 0 and max_val != math.inf else max_val
-                self.__dict__[attr] = default_current
-                self.__dict__[f"max_{attr}"] = max_val
-
-    def __add__(self, other: Stats):
-        if isinstance(other, Stats):
-            for attr in self.attrs:
-                current = self.__dict__[attr]
-                max_val = self.__dict__[f"max_{attr}"]
-                delta = other.__dict__.get(attr, 0)
-
-                new_value = current + delta
-
-                # clamp
-                new_value = max(0, min(new_value, max_val))
-
-                self.__dict__[attr] = new_value
-
-        return self
+    def __add__(self, other:Stats):
+        if type(other) == Stats:
+            for attr in Stats.attrs:
+                self.__dict__[attr] = self.__dict__[attr] + other.__dict__[attr] if self.__dict__[attr] + other.__dict__[attr] < self.__dict__['max_' + attr] else self.__dict__['max_' + attr]
+                if self.__dict__[attr] < 0:
+                    self.__dict__[attr] = 0
+                
+        return self  
 
     def __repr__(self):
         return " ".join(
