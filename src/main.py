@@ -63,7 +63,6 @@ def main():
             
     print(maxima, maxima.current_location)
     print(minimus, minimus.current_location)
-    print(minimus.alive)
     
     # print(mansion)
     # print(mb)

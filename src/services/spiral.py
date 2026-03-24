@@ -84,10 +84,12 @@ class SpiralGrid:
     def add_next_free(self, object:object) -> tuple:
         next_free = self.get_next_free()
         self.grid[next_free] = object
+        return next_free
         
-    def set_grid_field(self, object:object, pos:tuple):
+    def set_grid_field(self, object:object, pos:tuple) -> tuple:
         if not self.grid.get(pos):
             self.grid[pos] = object
+        return pos
 
     def set_next(self, value) -> tuple[int, int]:
         pos = self.get_next_free()

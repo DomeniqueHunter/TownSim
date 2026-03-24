@@ -31,9 +31,9 @@ class TownHall:
             self.town_grid.add_next_free(building)
 
         if building not in self.buildings:
+            building.address = self.town_grid.add_next_free(building)
             self.buildings.append(building)
-            # TODO: set address
-            
+                        
             if isinstance(building, HomeBuilding):
                 self.home_buildings.append(building)
 
