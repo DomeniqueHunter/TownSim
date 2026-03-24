@@ -9,8 +9,8 @@ def main():
     
     minimus = Person(name="Minimus")
     minimus.attributes + Stats(money=100)
-    # maxima = Person(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
-    
+    minimus.set_routine(1) # normal workflow, wakes up at home and sleeps at night
+        
     for _ in range(1000):
         town_hall.add_citizen(Person())
     

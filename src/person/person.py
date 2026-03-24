@@ -1,13 +1,15 @@
 from __future__ import annotations
 from stats import Stats, Attributes
+from person import routines
 
 import uuid
 import math
+from random import random
 
 
 class Person:
 
-    def __init__(self, *args, name:str=None, attributes:Attributes=None):
+    def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None):
         self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
         self.name = name or uuid.uuid4()  # maybe not a nice name but we will see
 
@@ -16,6 +18,16 @@ class Person:
         self.home = None
         self.workplace = None
         self.current_location = None
+        
+        self.set_routine(routine)
+        
+    def set_routine(self, routine:int=None):
+        if routine == None:
+            routine = random.randint(1,5)
+        elif routine > 5 or routine < 1:
+            routine = random.randint(1,5)
+        
+        self.routine = routines[routine]
 
     def interact_with(self, other:Person):
         pass

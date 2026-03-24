@@ -12,6 +12,7 @@ class Maxima(Person):
         Person.__init__(self)
         self.name = name
         self.attributes = attributes + Stats(money=math.inf) # cuz she is rich
+        self.set_routine(1) # normal workflow, wakes up at home and sleeps at night
         
 maxima = Maxima()
 
