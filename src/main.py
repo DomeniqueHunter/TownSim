@@ -7,7 +7,8 @@ from buildings import MegaBuilding, Mansion, Tile
 def main():
     town_hall = TownHall("Small Ville")
     
-    minimus = Person(name="Minimus", attributes=Attributes(money=100))
+    minimus = Person(name="Minimus")
+    minimus.attributes + Stats(money=100)
     # maxima = Person(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
     
     for _ in range(1000):
@@ -46,7 +47,7 @@ def main():
     round_malus = Stats(hunger=1)
     
     print()
-    for _ in range(12):
+    for _ in range(10):
         for citizen in town_hall.citizens:
             if not citizen.alive: continue
             
@@ -62,13 +63,14 @@ def main():
             
     print(maxima, maxima.current_location)
     print(minimus, minimus.current_location)
+    print(minimus.alive)
     
-    print(mansion)
-    print(mb)
-    print(poverty_building)
-    
-    print(town_hall.town_grid.grid)
-    town_hall.town_grid.show()
+    # print(mansion)
+    # print(mb)
+    # print(poverty_building)
+    #
+    # print(town_hall.town_grid.grid)
+    # town_hall.town_grid.show()
 
 
 if __name__ == "__main__":
