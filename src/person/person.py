@@ -1,7 +1,6 @@
 from __future__ import annotations
 from stats import Stats, Attributes
 
-
 import uuid
 import math
 
@@ -39,14 +38,17 @@ class Person:
         if self.home:
             self.home.owners.remove(self)
             self.home = None
+            
+    def action(self):
+        # based on current location, day time and personal routine
+        # go to location xyz or interact with location 
+        pass
 
     def apply_location(self):
         if self.current_location:
             self.attributes += self.current_location.location_stats()
 
     def find_place_to_live(self, buildings:list):
-        # buildings = town_hall.list_of_buildings()
-
         for building in buildings:
             # print(home_building.name, home_building.quality(), home_building.cost())
             if self.money() >= abs(building.cost()):

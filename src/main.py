@@ -62,6 +62,8 @@ def main():
 
             
     print(maxima, maxima.current_location)
+    print("*", maxima.home.building.address)
+    
     print(minimus, minimus.current_location)
     
     # print(mansion)

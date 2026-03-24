@@ -26,12 +26,13 @@ class TownHall:
         
     def add_building(self, building, tile:tuple=None):
         if tile:
-            self.town_grid.set_grid_field(building, tile)
+            building.address = self.town_grid.set_grid_field(building, tile)
         else:
-            self.town_grid.add_next_free(building)
+            building.address = self.town_grid.add_next_free(building)
+        
+        
 
         if building not in self.buildings:
-            building.address = self.town_grid.add_next_free(building)
             self.buildings.append(building)
                         
             if isinstance(building, HomeBuilding):
