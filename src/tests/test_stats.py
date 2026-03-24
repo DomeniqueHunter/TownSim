@@ -22,10 +22,11 @@ class TestStats(unittest.TestCase):
         self.assertEqual(6, stats3.meow)
 
     def test_attributes_attr(self):
-        attributes = Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=(0, 199999))
+        attributes = Attributes(health=(1000, 1000))
         person = Person(name="TestPerson", attributes=attributes)
 
         self.assertEqual(person.name, "TestPerson")
+        self.assertEqual(person.money(), 0)
 
     def test_attributes_dict(self):
         attr = {"health": (1000, 1000), "stamina": (1000, 1000), "hunger": (0, 10_000), "money": (0, 199999)}

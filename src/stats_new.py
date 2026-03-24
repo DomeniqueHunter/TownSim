@@ -1,5 +1,5 @@
 import math
-from test.test_import.data.package3.submodule import attr
+import copy
 
 
 class Stats:
@@ -12,7 +12,7 @@ class Stats:
     stats_schema = {'health': 0, 'stamina': 0, 'hunger': 0, 'money': 0}
 
     def __init__(self, attributes:dict=None, **kwargs):
-        _attributes = self.stats_schema
+        _attributes = copy.deepcopy(self.stats_schema)
 
         if attributes is not None:
             _attributes.update(attributes)
@@ -52,7 +52,7 @@ class Attributes:
     }
 
     def __init__(self, attributes:dict=None, **kwargs):
-        _attributes = self.attributes_schema
+        _attributes = copy.deepcopy(self.attributes_schema)
 
         if attributes is not None:
             _attributes.update(attributes)
@@ -115,7 +115,6 @@ def test():
     print('stats:', st + st2)
 
     attr + st
-
     print(attr)
     print('#########################################\n\n')
     attr + st2
