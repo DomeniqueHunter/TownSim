@@ -2,7 +2,7 @@
 import unittest
 
 from person import Person
-from stats_new import Stats, Attributes
+from stats import Stats, Attributes
 import math
 
 

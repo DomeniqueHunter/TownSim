@@ -1,4 +1,5 @@
 import math
+import copy
 
 
 class Stats:
@@ -6,29 +7,33 @@ class Stats:
     Stats will be added/removed to/from the Attributes
     Attribute modification
     """
-    
-    attrs = ['health', 'stamina', 'hunger', 'money']
-    
-    def __init__(self, *args, health:int=0, stamina:int=0, hunger:int=0, money:int=0):
-        self.health = health
-        self.stamina = stamina
-        self.hunger = hunger
-        self.money = money
-        
+
+    # attribute: value
+    stats_schema = {'health': 0, 'stamina': 0, 'hunger': 0, 'money': 0}
+
+    def __init__(self, attributes:dict=None, **kwargs):
+        _attributes = copy.deepcopy(self.stats_schema)
+
+        if attributes is not None:
+            _attributes.update(attributes)
+        elif kwargs:
+            _attributes.update(kwargs)
+
+        for attr, value in _attributes.items():
+            self.__dict__[attr] = value
+
     def __int__(self):
-        return self.health + self.stamina + self.hunger + self.money
-    
+        return sum([i for i in self.__dict__.values()])
+
     def __add__(self, other):
-        if type(other) == Stats:
-            self.health += other.health
-            self.stamina += other.stamina
-            self.hunger += other.hunger
-            self.money += other.money
-        
+        if isinstance(other, Stats):
+            for key in self.__dict__:
+                if key in other.__dict__:
+                    self.__dict__[key] += other.__dict__[key]
         return self
-    
+
     def __str__(self):
-        return f"{self.health} {self.stamina} {self.hunger} {self.money}"
+        return ", ".join(f"{key}: {value}" for key, value in self.__dict__.items())
 
 
 class Attributes:
@@ -38,38 +43,78 @@ class Attributes:
     init describes the start,max values of the char
     """
 
-    def __init__(self, *args, health:tuple=None, stamina:tuple=None, hunger:tuple=None, money:int | float=0):
-        self.health, self.max_health = health or (10, 10)
-        self.stamina, self.max_stamina = stamina or (10, 10)
-        self.hunger, self.max_hunger = hunger or (0, 10)
-        self.money, self.max_money = money, math.inf
-        
-    def __add__(self, other:Stats):
-        if type(other) == Stats:
-            for attr in Stats.attrs:
-                self.__dict__[attr] = self.__dict__[attr] + other.__dict__[attr] if self.__dict__[attr] + other.__dict__[attr] < self.__dict__['max_' + attr] else self.__dict__['max_' + attr]
-                if self.__dict__[attr] < 0:
-                    self.__dict__[attr] = 0
-                
-        return self            
-            
+    # attribute: (current_val, max_val)
+    attributes_schema = {
+        'health': (0, 10),
+        'stamina': (0, 10),
+        'hunger': (0, 10),
+        'money': (0, math.inf),
+    }
+
+    def __init__(self, attributes:dict=None, **kwargs):
+        _attributes = copy.deepcopy(self.attributes_schema)
+
+        if attributes is not None:
+            _attributes.update(attributes)
+        elif kwargs:
+            _attributes.update(kwargs)
+
+        for attr, (current_val, max_val) in _attributes.items():
+            self.__dict__[attr] = current_val
+            self.__dict__[f"max_{attr}"] = max_val
+
+    def __add__(self, other: Stats):
+        if isinstance(other, Stats):
+            for attr in Stats.stats_schema:
+                # skip if attribute does not exist in other
+                if not hasattr(other, attr):
+                    continue
+
+                current_value = getattr(self, attr)
+                other_value = getattr(other, attr)
+                max_value = getattr(self, f"max_{attr}")
+
+                new_value = current_value + other_value
+
+                if new_value > max_value:
+                    new_value = max_value
+                elif new_value < 0:
+                    new_value = 0
+
+                setattr(self, attr, new_value)
+
+        return self
+
     def __repr__(self):
-        stats_string = ""
-        for attr in Stats.attrs:
-            stats_string += f"{attr}:{self.__dict__[attr]}/{self.__dict__['max_'+attr]} "
-        return stats_string
+        return " ".join(
+            f"{attr}:{self.__dict__[attr]}/{self.__dict__[f'max_{attr}']}"
+            for attr in self.attributes_schema
+        )
 
 
 def test():
+    stats = Stats({'health': 5, 'stamina': 3, 'hunger': 4, 'money': 2})
+    stats2 = Stats({'health': 2, 'stamina': 3, 'hunger': 4, 'money': 10})
+    
+    print(stats)
+    print(stats.__dict__)
+    print(int(stats))
+    print(stats + stats2)
+
     attr = Attributes(health=(10, 100))
-    st = Stats(health=100, money=100_000_000)
-    st2 = Stats(health=-20, money=100_000)
-    print(attr) 
+    attrs = {
+        'health': (0, 100),
+        'stamina': (0, 10),
+        'hunger': (0, 10),
+        'money': (0, math.inf),
+    }
+    st = Stats({'health': 100, 'money': 100_000_000})
+    st2 = Stats({'health':-20, 'money': 100_000})
     
-    print('stats:', st + st2)   
-    
+    print(attr)
+    print('stats:', st + st2)
+
     attr + st
-    
     print(attr)
     print('#########################################\n\n')
     attr + st2

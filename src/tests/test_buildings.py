@@ -4,7 +4,7 @@ from buildings import MegaBuilding, Mansion
 
 
 def test():
-    attr = Attributes(health=(0, 10), money=0)
+    attr = Attributes(health=(0, 10))
     print(attr)
     
     mb = MegaBuilding()
