@@ -10,7 +10,7 @@ def main():
     minimus = Person(name="Minimus")
     minimus.attributes + Stats(money=100)
     minimus.set_routine(1) # normal workflow, wakes up at home and sleeps at night
-        
+    
     for _ in range(1000):
         town_hall.add_citizen(Person())
     
