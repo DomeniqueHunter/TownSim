@@ -1,5 +1,10 @@
-from buildings import Building
-from person import Person
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+from .building import Building
+
+if TYPE_CHECKING:
+    from person import Person
 
 
 class Tile(Building):

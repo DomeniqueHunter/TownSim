@@ -1,32 +1,52 @@
 from __future__ import annotations
 from stats import Stats, Attributes
-from person import routines
+from .routine import routines, DayTime, ActionType
 
 import uuid
 import math
-from random import random
+import random
+from collections import Counter, deque
+
+
+# a person tries to keep this many food items in the inventory
+FOOD_STOCK_TARGET = 3
+# one food item reduces hunger by this much
+FOOD_RELIEF = 1
+# sims eat at home when they wake up and when they get back home
+MEAL_ACTIONS = (ActionType.WAKEUP, ActionType.GO_HOME)
 
 
 class Person:
 
     def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None):
         self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
-        self.name = name or uuid.uuid4()  # maybe not a nice name but we will see
+        self.name = name or str(uuid.uuid4())  # maybe not a nice name but we will see
 
         self.alive = True
+        self.cause_of_death = None
+
+        self.inventory = {"food": 0}
+
+        self.ledger = None          # set by the TownHall when the person becomes a citizen
+        self.totals = Counter()     # lifetime: food_bought, food_eaten, money_spent, money_earned
+        self.log = deque(maxlen=12) # recent events: (day, phase, text)
+        self.current_action = None  # what the routine said in the last phase
+        self.last_phase = None
 
         self.home = None
         self.workplace = None
+        self.shop = None
+        self.leisure_spot = None    # TODO set once leisure buildings exist
         self.current_location = None
-        
+
         self.set_routine(routine)
-        
+
     def set_routine(self, routine:int=None):
-        if routine == None:
-            routine = random.randint(1,5)
-        elif routine > 5 or routine < 1:
-            routine = random.randint(1,5)
-        
+        # no / invalid routine given -> pick a random one
+        if routine is None or not 1 <= routine <= len(routines):
+            routine = random.randint(1, len(routines))
+
+        self.routine_id = routine
         self.routine = routines[routine]
 
     def interact_with(self, other:Person):
@@ -36,51 +56,164 @@ class Person:
         return self.attributes.money
 
     def check(self, verbose=False):
-        if self.attributes.hunger == self.attributes.max_hunger:
-            self.alive = False
-            self.die(verbose=verbose)
+        if self.alive and self.attributes.hunger >= self.attributes.max_hunger:
+            self.die("starvation", verbose=verbose)
 
         return self.alive
 
-    def die(self, verbose=False):
+    def die(self, cause:str="unknown", verbose=False):
+        self.alive = False
+        self.cause_of_death = cause
         if verbose: print(f"sim: {self.name} died")
+
         if self.current_location:
             self.current_location.leave(self)
 
+        if self.workplace:
+            self.workplace.dismiss(self)
+
         if self.home:
-            self.home.owners.remove(self)
+            if self in self.home.owners:
+                self.home.owners.remove(self)
             self.home = None
-            
-    def action(self):
-        # based on current location, day time and personal routine
-        # go to location xyz or interact with location 
-        pass
+
+    def note(self, phase:DayTime|None, text:str) -> None:
+        """remembers something that happened to the person"""
+        day = self.ledger.day if self.ledger is not None else 0
+        self.log.append((day, phase.name if phase is not None else None, text))
+
+    def _record(self, kind:str, amount:int) -> None:
+        if self.ledger is not None:
+            self.ledger.record(kind, amount)
+
+    def earn(self, amount:int, phase:DayTime=None, source:str=None) -> None:
+        """money earned by working"""
+        self.attributes += Stats(money=amount)
+        self.totals["money_earned"] += amount
+        self._record("wages_paid", amount)
+        self.note(phase, f"earned {amount} at {source}" if source else f"earned {amount}")
+
+    def is_working(self, phase:DayTime) -> bool:
+        return self.routine[phase] == ActionType.WORK
+
+    def destination_for(self, action:ActionType):
+        """
+        Where the person has to be for the given action.
+        Falls back to home if the person has no such place (yet).
+        """
+        targets = {
+            ActionType.GO_TO_WORK: self.workplace,
+            ActionType.WORK: self.workplace,
+            ActionType.GO_TO_SHOP: self.shop,
+            ActionType.SHOP: self.shop,
+            ActionType.GO_TO_LEISURE: self.leisure_spot,
+            ActionType.LEISURE: self.leisure_spot,
+        }
+        # wake up, sleep and go home all happen at home
+        return targets.get(action) or self.home
+
+    def action(self, phase:DayTime):
+        """
+        Does what the personal routine says for this phase of the day
+        and returns the ActionType. Movement phases are instant for now.
+        """
+        action = self.routine[phase]
+        self.current_action = action
+        self.last_phase = phase
+        self.go(self.destination_for(action))
+
+        if action == ActionType.SHOP:
+            self.buy_food(phase)
+        elif action in MEAL_ACTIONS:
+            self.eat(phase)
+
+        return action
+
+    def buy_food(self, phase:DayTime=None) -> int:
+        """
+        Fills up the food inventory (as far as the money allows).
+        Only works while the person is in his shop. Returns the amount bought.
+        """
+        if self.shop is None or self.current_location is not self.shop:
+            return 0
+
+        wanted = FOOD_STOCK_TARGET - self.inventory["food"]
+        bought = self.shop.sell_food(self, wanted)
+
+        if bought:
+            cost = bought * self.shop.food_price
+            self.totals["food_bought"] += bought
+            self.totals["money_spent"] += cost
+            self._record("food_bought", bought)
+            self._record("money_spent", cost)
+            self.note(phase, f"bought {bought} food for {cost}")
+
+        return bought
+
+    def eat(self, phase:DayTime=None) -> int:
+        """
+        Eats at home until not hungry anymore or out of food.
+        Returns the amount of food eaten.
+        """
+        if self.home is None or self.current_location is not self.home:
+            return 0
+
+        eaten = 0
+        while self.attributes.hunger > 0 and self.inventory["food"] > 0:
+            self.inventory["food"] -= 1
+            self.attributes += Stats(hunger=-FOOD_RELIEF)
+            eaten += 1
+
+        if eaten:
+            self.totals["food_eaten"] += eaten
+            self._record("food_eaten", eaten)
+            self.note(phase, f"ate {eaten} food")
+
+        return eaten
 
     def apply_location(self):
         if self.current_location:
             self.attributes += self.current_location.location_stats()
 
-    def find_place_to_live(self, buildings:list):
+    def find_place_to_live(self, buildings:list) -> bool:
+        """
+        Claims a free unit in the first building the person can afford.
+        Returns True if a home was found, False otherwise.
+        """
         for building in buildings:
-            # print(home_building.name, home_building.quality(), home_building.cost())
-            if self.money() >= abs(building.cost()):
-                unit = building.get_free_unit()
-                if unit.claim(self):
-                    self.home = unit
-                    break
+            if self.money() < building.rent():
+                continue
+
+            unit = building.get_free_unit()
+            if unit is not None and unit.claim(self):
+                self.home = unit
+                return True
+
+        return False
+
+    def find_shop(self, shops:list) -> bool:
+        """picks the shop to buy food at, returns False if there is none"""
+        self.shop = shops[0] if shops else None
+        return self.shop is not None
 
     def go(self, location):
-        if location:
-            return location.enter(self)
+        if location is None:
+            return False
+
+        # leave wherever we were before
+        if self.current_location is not None and self.current_location is not location:
+            self.current_location.leave(self)
+
+        return location.enter(self)
 
     def __repr__(self):
         status = "alive" if self.alive else "dead"
-        return f"{self.name}: {self.home} {status} ({self.attributes})"
+        return f"{self.name}: {self.home} {status} ({self.attributes}) food:{self.inventory['food']}"
 
 
 def main():
     person = Person(name="Minimus")
-    mega_person = Person(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=math.inf))
+    mega_person = Person(name="Maxima", attributes=Attributes(health=(1000, 1000), stamina=(1000, 1000), hunger=(0, 10_000), money=(math.inf, math.inf)))
 
     print(person, person.money())
     print(mega_person, mega_person.money())

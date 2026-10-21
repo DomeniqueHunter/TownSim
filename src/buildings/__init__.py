@@ -4,7 +4,8 @@ from .building import Building
 from .home_building import HomeBuilding
 from .mansion import Mansion
 from .mega_building import MegaBuilding
-from .work_building import WorkBuilding
+from .work_building import WorkBuilding, WAGES
+from .shop import Shop
 from .tile import Tile
 
 
@@ -15,5 +16,7 @@ __all__ = [
     'Mansion',
     'MegaBuilding',
     'WorkBuilding',
+    'WAGES',
+    'Shop',
     'Tile',
     ]

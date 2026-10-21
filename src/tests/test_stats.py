@@ -45,6 +45,31 @@ class TestStats(unittest.TestCase):
         self.assertEqual(1000, attributes.stamina)
         self.assertEqual(10, attributes.hunger)
 
+    def test_stats_add_does_not_mutate(self):
+        stats1 = Stats(health=10)
+        stats2 = Stats(health=1)
+        stats3 = stats1 + stats2
+
+        self.assertEqual(11, stats3.health)
+        self.assertEqual(10, stats1.health)
+        self.assertEqual(1, stats2.health)
+
+    def test_attributes_add_returns_new_object(self):
+        attributes = Attributes(health=(5, 10))
+        result = attributes + Stats(health=3)
+
+        self.assertEqual(8, result.health)
+        self.assertEqual(5, attributes.health)
+
+    def test_attributes_are_clamped(self):
+        attributes = Attributes(health=(5, 10))
+
+        attributes += Stats(health=100)
+        self.assertEqual(10, attributes.health)
+
+        attributes += Stats(health=-100)
+        self.assertEqual(0, attributes.health)
+
 
 if __name__ == "__main__":
     unittest.main()

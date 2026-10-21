@@ -26,11 +26,13 @@ class Stats:
         return sum([i for i in self.__dict__.values()])
 
     def __add__(self, other):
+        # returns a NEW Stats, neither operand is modified
+        result = Stats(dict(self.__dict__))
         if isinstance(other, Stats):
-            for key in self.__dict__:
+            for key in result.__dict__:
                 if key in other.__dict__:
-                    self.__dict__[key] += other.__dict__[key]
-        return self
+                    result.__dict__[key] += other.__dict__[key]
+        return result
 
     def __str__(self):
         return ", ".join(f"{key}: {value}" for key, value in self.__dict__.items())
@@ -64,15 +66,17 @@ class Attributes:
             self.__dict__[f"max_{attr}"] = max_val
 
     def __add__(self, other: Stats):
+        # returns a NEW Attributes, use `attrs += stats` to update in place
+        result = copy.copy(self)
         if isinstance(other, Stats):
             for attr in Stats.stats_schema:
                 # skip if attribute does not exist in other
                 if not hasattr(other, attr):
                     continue
 
-                current_value = getattr(self, attr)
+                current_value = getattr(result, attr)
                 other_value = getattr(other, attr)
-                max_value = getattr(self, f"max_{attr}")
+                max_value = getattr(result, f"max_{attr}")
 
                 new_value = current_value + other_value
 
@@ -81,9 +85,9 @@ class Attributes:
                 elif new_value < 0:
                     new_value = 0
 
-                setattr(self, attr, new_value)
+                setattr(result, attr, new_value)
 
-        return self
+        return result
 
     def __repr__(self):
         return " ".join(
@@ -114,13 +118,13 @@ def test():
     print(attr)
     print('stats:', st + st2)
 
-    attr + st
+    attr += st
     print(attr)
     print('#########################################\n\n')
-    attr + st2
+    attr += st2
     print(attr)
     print('#########################################\n\n')
-    attr + st2
+    attr += st2
     print(attr)
 
 
