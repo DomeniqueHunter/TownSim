@@ -47,7 +47,7 @@ python console.py npc Maxima              # all her stats, food, money, recent e
 python console.py follow Maxima           # live: a line whenever she goes somewhere or does something
 python console.py building "Corner Shop"  # a building, by name or address: building 5,5
 python console.py buildings               # all buildings, who is there, how full
-python console.py people 20 money         # 20 citizens, sorted by hunger | money | name
+python console.py people 20 age           # 20 citizens, sorted by hunger | money | name | age
 python console.py graveyard               # the dead: cycle of death, name, cause (also: graveyard 50 | all)
 python console.py goods 10                # food bought / eaten, money spent, wages, per day
 python console.py map Maxima              # text map of the town, * marks where she is
@@ -82,3 +82,16 @@ cycle 11: alive 902, died 0, new 0, food 2382, shop revenue 57010
 `new` counts citizens who joined the town during that cycle (births, once they exist). Everybody who is
 there when the simulation starts is a founder and not counted. Old save files do not fit anymore
 (the save format changed), start once with `--new`.
+
+
+## Ageing
+
+Every sim has an `age` in cycles (starts at 0, +1 at the end of every cycle) and a `lifespan`, a random
+whole number from 90 to 110 picked when the sim is created (`LIFESPAN_RANGE` in `person/person.py`).
+When the age reaches the lifespan the sim dies of "old age" and is buried in the graveyard. If a sim
+would starve and die of old age in the same cycle, "starvation" is named. Maxima has an infinite
+lifespan. `console.py npc <name>` shows `age: 12/97 cycles`, `console.py people 10 age` lists the oldest.
+
+All sims of the demo town start at age 0, so after cycle 90 the town dies out in a wave (about 40
+deaths per cycle) until only Maxima is left around cycle 110. Without births nobody replaces them.
+Old save files do not fit anymore, start once with `--new`.

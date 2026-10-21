@@ -14,16 +14,32 @@ FOOD_STOCK_TARGET = 3
 FOOD_RELIEF = 1
 # sims eat at home when they wake up and when they get back home
 MEAL_ACTIONS = (ActionType.WAKEUP, ActionType.GO_HOME)
+# every sim gets a random lifespan (in cycles) from this range, both ends included
+LIFESPAN_RANGE = (90, 110)
 
 
 class Person:
 
-    def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None):
+    def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None,
+                 age:int=0, lifespan:float=None):
+        """
+        `age` is counted in cycles. The sim dies of old age when its age reaches
+        `lifespan`. Without a lifespan a random one from LIFESPAN_RANGE is picked,
+        math.inf means the sim never dies of old age.
+        """
+        if age < 0:
+            raise ValueError("age cannot be negative")
+        if lifespan is not None and lifespan <= 0:
+            raise ValueError("lifespan must be positive")
+
         self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
         self.name = name or str(uuid.uuid4())  # maybe not a nice name but we will see
 
         self.alive = True
         self.cause_of_death = None
+
+        self.age = age
+        self.lifespan = lifespan if lifespan is not None else random.randint(*LIFESPAN_RANGE)
 
         self.inventory = {"food": 0}
 
@@ -55,9 +71,22 @@ class Person:
     def money(self):
         return self.attributes.money
 
+    def grow_older(self) -> None:
+        """one cycle older"""
+        self.age += 1
+
     def check(self, verbose=False):
-        if self.alive and self.attributes.hunger >= self.attributes.max_hunger:
+        """
+        Dies of starvation or old age. Returns whether the person is still alive.
+        If both would happen at once, starvation is named as the cause.
+        """
+        if not self.alive:
+            return False
+
+        if self.attributes.hunger >= self.attributes.max_hunger:
             self.die("starvation", verbose=verbose)
+        elif self.age >= self.lifespan:
+            self.die("old age", verbose=verbose)
 
         return self.alive
 

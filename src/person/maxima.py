@@ -12,7 +12,8 @@ class Maxima(Person):
         attributes += Stats(money=math.inf)  # cuz she is rich
 
         # routine 1: normal workflow, wakes up at home and sleeps at night
-        super().__init__(name=name, attributes=attributes, routine=1)
+        # she never dies of old age
+        super().__init__(name=name, attributes=attributes, routine=1, lifespan=math.inf)
 
 
 maxima = Maxima()

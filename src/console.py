@@ -7,7 +7,7 @@ Ask a running game things.
     python console.py follow Maxima          live: prints what she does, phase by phase
     python console.py building "Corner Shop" a building (name or address like 5,5)
     python console.py buildings              all buildings
-    python console.py people 20 money        20 citizens, sorted by hunger|money|name
+    python console.py people 20 age          20 citizens, sorted by hunger|money|name|age
     python console.py graveyard              the dead: cycle of death, name, cause (also: graveyard 50 | all)
     python console.py goods 10               food bought/eaten, money spent, wages
     python console.py map Maxima             town map, * marks where she is
@@ -76,6 +76,7 @@ def fmt_npc(data:dict) -> str:
         f"  work:      {work['building'] + ' (' + work['role'] + ')' if work else '-'}",
         f"  shop:      {shop['building'] if shop else '-'}",
         f"  routine:   {data['routine']}",
+        f"  age:       {fmt_stat(stats['age'])} cycles (dies of old age at the end)",
         f"  lifetime:  bought {totals.get('food_bought', 0)} food for {num(totals.get('money_spent', 0))}, "
         f"ate {totals.get('food_eaten', 0)} food, earned {num(totals.get('money_earned', 0))}",
     ]
@@ -95,9 +96,9 @@ def fmt_table(headers:list, rows:list) -> str:
 
 
 def fmt_people(data:dict) -> str:
-    rows = [[p["name"][:8], p["location"], (p["action"] or "-").lower(), p["hunger"],
+    rows = [[p["name"][:8], p["age"], p["location"], (p["action"] or "-").lower(), p["hunger"],
              num(p["money"]), p["food"], p["workplace"] or "-"] for p in data["people"]]
-    table = fmt_table(["name", "location", "action", "hunger", "money", "food", "work"], rows)
+    table = fmt_table(["name", "age", "location", "action", "hunger", "money", "food", "work"], rows)
     return f"{len(rows)} of {data['total']} citizens, sorted by {data['sort']}\n{table}"
 
 
@@ -313,7 +314,7 @@ COMMANDS = {
     "follow": (cmd_follow, "<npc>  live view of what the npc does"),
     "building": (cmd_building, "<name|y,x>  details of a building"),
     "buildings": (cmd_buildings, "all buildings"),
-    "people": (cmd_people, "[N] [hunger|money|name]  list citizens"),
+    "people": (cmd_people, "[N] [hunger|money|name|age]  list citizens"),
     "graveyard": (cmd_graveyard, "[N|all]  the dead: cycle of death, name, cause (newest first)"),
     "goods": (cmd_goods, "[days]  food bought/eaten, money spent, wages"),
     "map": (cmd_map, "[npc]  town map, marks where the npc is"),

@@ -191,6 +191,7 @@ def person_info(sim, person) -> dict:
             "stamina": stat(attributes.stamina, attributes.max_stamina),
             "hunger": stat(attributes.hunger, attributes.max_hunger),
             "money": stat(attributes.money, attributes.max_money),
+            "age": stat(person.age, person.lifespan),
         },
         "inventory": dict(person.inventory),
         "home": None if home is None else {"building": home.building.name, "unit": home.unit_number,
@@ -278,6 +279,7 @@ def cmd_people(sim, args):
         "hunger": lambda p: -p.attributes.hunger,
         "money": lambda p: -p.money() if p.money() != float("inf") else float("-inf"),
         "name": lambda p: str(p.name),
+        "age": lambda p: -p.age,
     }
     if sort not in sorters:
         raise QueryError(f"cannot sort by {sort!r}, use one of: {', '.join(sorters)}")
@@ -291,6 +293,7 @@ def cmd_people(sim, args):
                 "name": str(p.name),
                 "location": location_info(p)["text"],
                 "action": p.current_action.name if p.current_action else None,
+                "age": p.age,
                 "hunger": p.attributes.hunger,
                 "money": p.money(),
                 "food": p.inventory["food"],

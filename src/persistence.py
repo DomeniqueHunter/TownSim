@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 
-SAVE_VERSION = 4
+SAVE_VERSION = 5
 
 
 class SaveError(Exception):

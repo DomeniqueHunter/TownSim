@@ -135,6 +135,7 @@ class Simulation:
                 citizen.attributes += citizen.home.location_stats()
 
             citizen.attributes += self.daily_malus
+            citizen.grow_older()
 
             if not citizen.check():
                 self.town_hall.graveyard.bury(citizen.name, self.cycle, citizen.cause_of_death or "unknown")
