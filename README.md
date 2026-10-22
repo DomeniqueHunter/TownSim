@@ -92,6 +92,105 @@ When the age reaches the lifespan the sim dies of "old age" and is buried in the
 would starve and die of old age in the same cycle, "starvation" is named. Maxima has an infinite
 lifespan. `console.py npc <name>` shows `age: 12/97 cycles`, `console.py people 10 age` lists the oldest.
 
-All sims of the demo town start at age 0, so after cycle 90 the town dies out in a wave (about 40
-deaths per cycle) until only Maxima is left around cycle 110. Without births nobody replaces them.
-Old save files do not fit anymore, start once with `--new`.
+A sim made without an age is grown up (18), babies are made with `age=0`.
+
+
+## Reproduction
+
+Rules (from `idea.md`, the numbers can be changed in `person/person.py` and `reproduction.py`):
+
+- Sims are genderless, any two can mate. They have to be **18 to 50** (`FERTILE_AGES`) and not already expecting a child.
+- Two sims **meet while they relax (LEISURE) in the same place**. Until there are leisure buildings that is the
+  home they share, so somebody who lives alone (Maxima in her Villa) never has children. Sims who relax
+  together are paired up at random, every pair mates with a chance of 20% (`MATE_CHANCE`).
+- One of the two is picked by chance as the "mother". The baby is born **2 cycles later** (`PREGNANCY_CYCLES`),
+  at the end of the cycle. If the mother dies before that, the baby is lost.
+- Mating only works while there is a free place to live (rent 0) for every baby on its way. The baby lives
+  with its mother if her unit has room, else in another free home.
+- The baby is a normal sim: age 0, a random lifespan of 90 to 110 cycles, a random routine, a random name.
+  It counts as `new` in the log line of the cycle it is born in.
+
+Children and grown ups:
+
+- Under 18 a sim is a child: it stays at home all day, has no job and no shop, and **does not get hungry**
+  (the household feeds it, this is a simplification, children cost nothing).
+- At 18 the sim gets a shop and the first free job (factory first, then the shop). **This happens once.**
+  If no job is free the sim has no income and starves after 10 days. Nobody is hired later, so the number
+  of jobs limits the population together with the number of homes.
+
+The demo town (`main.py`) starts with 1000 sims of all ages from 0 to 89, so it does not grow old all at once.
+In a 400 cycle test it first drops to about 650 sims (the oldest die while the first babies grow up) and then
+holds at about 950 to 990 with 8 to 12 births and deaths per cycle. The limit is the number of homes.
+`console.py npc <name>` shows age, parents, number of children and a pregnancy, `console.py world` the number
+of children and pregnancies.
+
+Old save files do not fit anymore (the save format changed), start once with `--new`.
+
+
+## Items: put things into the running game
+
+While the game runs, drop a JSON file into the folder `src/items/` (made at the start, other place: `--items-dir DIR`,
+off: `--no-items`). The game takes it over, and renames it to `_consumed_<name>_<timestamp>.json`
+(timestamp = seconds since 1970 when it was taken over; a second file in the same second gets `_2`, ...).
+Start with `src/items/_example_bread.json`: copy it to `bread.json`. Files that start with `_` or `.` and files
+that do not end in `.json` are ignored.
+
+```json
+{
+  "format": 1,
+  "items": [
+    {
+      "id": "bread",
+      "name": "Bread",
+      "category": "food",
+      "price": 3,
+      "stock": 200,
+      "effects": { "hunger": -2 },
+      "description": "Fresh from the bakery."
+    }
+  ]
+}
+```
+
+| field | required | rule |
+|---|---|---|
+| `format` (top level) | yes | `1` |
+| `items` (top level) | yes | list with at least one item |
+| `id` | yes | lowercase letters, digits, `_` `-`, starts with a letter, at most 40 characters. Key of the item everywhere |
+| `name` | yes | the shown name, 1 to 60 characters |
+| `category` | yes | `food` (more categories will come) |
+| `price` | yes | whole number >= 0, money per piece |
+| `stock` | yes | whole number >= 0, pieces added |
+| `effects` | for food | what one piece does when eaten: `hunger`, `health`, `stamina`, whole numbers. A food has to lower hunger (`hunger` negative) |
+| `description` | no | free text |
+| `store` | no | name of the shop that gets the pieces, default: the first shop |
+| `deliver_to` | no | name of a sim: the pieces go straight into his inventory, not into a shop. `stock` must be at least 1. Cannot be combined with `store` |
+
+Rules:
+
+- **Strict.** Only whole numbers (`3`, not `3.5` or `"3"`), no unknown fields (a typo like `pirce` is an error, with a
+  hint), no unknown categories, no key twice in one object. Every problem is printed with its place, for example
+  `items[0].price: must be a whole number >= 0, got "3"`.
+- **All or nothing.** If anything in a file is wrong, also if a shop or sim does not exist, nothing is taken over. An
+  invalid file stays where it is and is only looked at again after you changed it.
+- **Existing items.** The same `id` again adds the `stock` and replaces the `price`. Category and `effects` must stay the
+  same everywhere in the town (a file cannot quietly turn bread into something else), `name` and `description` are
+  updated. The plain food of the game has the id `food` (effects `hunger -1`, unlimited stock):
+  a file with `"id": "food", "stock": 0` and a new price changes its price.
+- **Timing.** A file is read when it has been unchanged for a second (so a file that is still being copied is not judged).
+  The game looks between two cycles: items are applied, the state is saved, then the file is renamed.
+  An interrupted game never loses items.
+- **Optional on purpose:** `store` and `deliver_to`. Without them an item behaves like any other. `deliver_to` is the way
+  to make sure something lands at Maxima.
+
+What the sims do with items:
+
+- At the shop a sim fills up to 3 pieces of food (of any kind) as far as his money allows. He takes the **best value
+  first** (most hunger relief per money, then the bigger relief), and the next one if that is sold out or too expensive.
+- At home (waking up, coming home) he eats until not hungry: the food with the biggest relief that is not wasted first.
+  Each piece also does its other `effects` (health, stamina). Pieces that do not lower hunger are never eaten.
+- `python main.py --new --empty-shops`: the shop starts without the plain food, so sims starve after 10 days until
+  you drop the first items. Without that flag the plain food is always there.
+- `console.py items` lists every item with effects, where it is sold and how many pieces sims hold, `console.py building
+  "Corner Shop"` shows the shelf, `console.py npc <name>` the inventory.
+

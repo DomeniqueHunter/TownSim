@@ -11,18 +11,23 @@ from buildings import MegaBuilding, Mansion, Tile, WorkBuilding, Shop
 from simulation import Simulation
 from persistence import SaveError, load_state, save_state
 from gameserver import GameServer
+from itemfeed import ItemFeed
 import protocol
 
 
 SAVE_FILE = Path(__file__).resolve().parent / "savegame.pkl"
+ITEMS_DIR = Path(__file__).resolve().parent / "items"
 
 # The first sims have all ages from 0 up to this (the shortest lifespan is 90), so the
 # town does not grow old and die all at once.
 FOUNDER_MAX_AGE = 89
 
 
-def build_town() -> TownHall:
-    """creates a fresh town with its citizens and buildings"""
+def build_town(default_food:bool=True) -> TownHall:
+    """
+    creates a fresh town with its citizens and buildings.
+    default_food=False: the shop starts empty, sims starve until items are put into the items folder
+    """
     town_hall = TownHall("Small Ville")
 
     maxima = Maxima()
@@ -52,7 +57,7 @@ def build_town() -> TownHall:
     town_hall.add_building(Tile("Grass Land", "GL"), (10,0))
 
     factory = WorkBuilding("Small Factory", work_places=600)
-    shop = Shop("Corner Shop", work_places=300, food_price=5)
+    shop = Shop("Corner Shop", work_places=300, food_price=5, default_food=default_food)
     town_hall.add_building(factory)
     town_hall.add_building(shop)
 
@@ -85,10 +90,14 @@ def build_town() -> TownHall:
 MIN_PHASE_DELAY = 0.001
 
 
-def run_cycles(sim:Simulation, cycles:int|None, save_path, phase_delay:float=0.0) -> int:
+def run_cycles(sim:Simulation, cycles:int|None, save_path, phase_delay:float=0.0, feed:ItemFeed=None) -> int:
     """
     Runs `cycles` days (None = no limit) and saves the state after every day.
     `phase_delay` is a pause in seconds after every phase (to watch the town).
+    `feed` is the items folder: after every day the new files are applied, then the
+    state is saved, and only then the applied files are renamed. That order makes sure
+    that items are never lost: an interrupted game either has them in the save, or
+    the file is still there to be applied again.
     Stops early when nobody is alive anymore. Returns the number of days run.
     """
     days = 0
@@ -98,7 +107,11 @@ def run_cycles(sim:Simulation, cycles:int|None, save_path, phase_delay:float=0.0
             break
 
         sim.run_cycle(phase_delay)
+        if feed is not None:
+            feed.poll(sim)
         save_state(sim, save_path)
+        if feed is not None:
+            feed.finish()
         days += 1
 
         totals, report = sim.totals(), sim.last_cycle()
@@ -136,6 +149,12 @@ def parse_args(argv=None):
                         help=f"port console.py and display.py connect to (default: {protocol.DEFAULT_PORT})")
     parser.add_argument("--no-server", action="store_true",
                         help="do not let console.py / display.py connect to the game")
+    parser.add_argument("--items-dir", type=Path, default=ITEMS_DIR, metavar="DIR",
+                        help=f"folder to drop item files into while the game runs (default: {ITEMS_DIR.name}/)")
+    parser.add_argument("--no-items", action="store_true", help="do not watch an items folder")
+    parser.add_argument("--empty-shops", action="store_true",
+                        help="new town only: the shop starts without food, sims starve until you drop items "
+                             "into the items folder")
     return parser.parse_args(argv)
 
 
@@ -150,10 +169,22 @@ def main(argv=None) -> int:
             print("use --new to start a new town (this overwrites the save file)", file=sys.stderr)
             return 1
         print(f"resumed {sim.town_hall.town_name} from {args.save_file} at cycle {sim.cycle}")
+        if args.empty_shops:
+            print("warning: --empty-shops only counts for a new town, use --new as well", file=sys.stderr)
     else:
-        sim = Simulation(build_town())
+        sim = Simulation(build_town(default_food=not args.empty_shops))
         save_state(sim, args.save_file)
         print(f"started a new town, saving to {args.save_file}")
+
+    feed = None
+    if not args.no_items:
+        feed = ItemFeed(args.items_dir)
+        try:
+            feed.ensure_folder()
+            print(f"items: put JSON files into {args.items_dir} while the game runs (see README)")
+        except OSError as error:
+            print(f"warning: cannot use the items folder {args.items_dir} ({error})", file=sys.stderr)
+            feed = None
 
     server = None
     if not args.no_server:
@@ -169,7 +200,7 @@ def main(argv=None) -> int:
     phase_delay = args.delay if server is None else max(args.delay, MIN_PHASE_DELAY)
 
     try:
-        run_cycles(sim, args.cycles, args.save_file, phase_delay)
+        run_cycles(sim, args.cycles, args.save_file, phase_delay, feed)
     except KeyboardInterrupt:
         # the interrupt may have hit in the middle of a cycle, so go back to
         # the last complete state that was saved

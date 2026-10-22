@@ -1,6 +1,7 @@
 from __future__ import annotations
 from stats import Stats, Attributes
 from .routine import routines, DayTime, ActionType
+from items import BUILTIN
 
 import uuid
 import math
@@ -9,10 +10,8 @@ from collections import Counter, deque
 from typing import NamedTuple
 
 
-# a person tries to keep this many food items in the inventory
+# a person tries to keep this many pieces of food (of any kind) in the inventory
 FOOD_STOCK_TARGET = 3
-# one food item reduces hunger by this much
-FOOD_RELIEF = 1
 # sims eat at home when they wake up and when they get back home
 MEAL_ACTIONS = (ActionType.WAKEUP, ActionType.GO_HOME)
 # every sim gets a random lifespan (in cycles) from this range, both ends included
@@ -63,7 +62,8 @@ class Person:
         self.children = 0           # how many children the sim has had
         self.pregnancy = None       # a Pregnancy while a baby is on its way
 
-        self.inventory = {"food": 0}
+        self.inventory = {"food": 0}        # item id -> number of pieces
+        self.catalog = None                 # set by the TownHall, tells what the items in the inventory are
 
         self.ledger = None          # set by the TownHall when the person becomes a citizen
         self.totals = Counter()     # lifetime: food_bought, food_eaten, money_spent, money_earned
@@ -195,47 +195,114 @@ class Person:
 
         return action
 
+    def _item(self, item_id:str):
+        """what the item with this id is (None if nobody knows it)"""
+        return (self.catalog.get(item_id) if self.catalog is not None else BUILTIN.get(item_id))
+
+    def food_count(self) -> int:
+        """pieces of food of any kind in the inventory"""
+        total = 0
+        for item_id, count in self.inventory.items():
+            item = self._item(item_id)
+            if count > 0 and item is not None and item.category == "food":
+                total += count
+        return total
+
+    def _food_offers(self) -> list:
+        """
+        What the shop has that fills the stomach, the best value for the money
+        first: most hunger relief per money, then the biggest relief, then the id.
+        """
+        ranked = []
+        for offer in self.shop.stock.values():
+            item = self._item(offer.item_id)
+            if item is None or item.category != "food" or offer.quantity <= 0:
+                continue
+            relief = -item.effects.get("hunger", 0)
+            if relief <= 0:
+                continue
+            value = math.inf if offer.price == 0 else relief / offer.price
+            ranked.append(((-value, -relief, offer.item_id), offer))
+        ranked.sort(key=lambda entry: entry[0])
+        return [offer for _, offer in ranked]
+
     def buy_food(self, phase:DayTime=None) -> int:
         """
-        Fills up the food inventory (as far as the money allows).
-        Only works while the person is in his shop. Returns the amount bought.
+        Fills up the food inventory (as far as the money allows): the best value
+        first, then the next one if the first is sold out or too expensive.
+        Only works while the person is in his shop. Returns the pieces bought.
         """
         if self.shop is None or self.current_location is not self.shop:
             return 0
 
-        wanted = FOOD_STOCK_TARGET - self.inventory["food"]
-        bought = self.shop.sell_food(self, wanted)
+        wanted = FOOD_STOCK_TARGET - self.food_count()
+        bought_in_total = 0
+        for offer in self._food_offers():
+            if wanted <= 0:
+                break
 
-        if bought:
-            cost = bought * self.shop.food_price
+            bought = self.shop.sell(self, offer.item_id, wanted)
+            if not bought:
+                continue
+
+            cost = bought * offer.price
             self.totals["food_bought"] += bought
             self.totals["money_spent"] += cost
             self._record("food_bought", bought)
             self._record("money_spent", cost)
-            self.note(phase, f"bought {bought} food for {cost}")
+            self.note(phase, f"bought {bought} {self._item(offer.item_id).name} for {cost}")
+            wanted -= bought
+            bought_in_total += bought
 
-        return bought
+        return bought_in_total
+
+    def _food_to_eat(self):
+        """
+        The food to eat next: the one that relieves the most hunger without
+        being wasted. If everything is more than needed, the smallest one.
+        """
+        hunger = self.attributes.hunger
+        candidates = []
+        for item_id, count in sorted(self.inventory.items()):
+            item = self._item(item_id)
+            if count > 0 and item is not None and item.category == "food":
+                relief = -item.effects.get("hunger", 0)
+                if relief > 0:
+                    candidates.append((relief, item))
+        if not candidates:
+            return None
+
+        fitting = [entry for entry in candidates if entry[0] <= hunger]
+        if fitting:
+            return max(fitting, key=lambda entry: entry[0])[1]
+        return min(candidates, key=lambda entry: entry[0])[1]
 
     def eat(self, phase:DayTime=None) -> int:
         """
-        Eats at home until not hungry anymore or out of food.
-        Returns the amount of food eaten.
+        Eats at home until not hungry anymore or out of food. Every piece does
+        what its item says (hunger, and maybe health or stamina).
+        Returns the number of pieces eaten.
         """
         if self.home is None or self.current_location is not self.home:
             return 0
 
-        eaten = 0
-        while self.attributes.hunger > 0 and self.inventory["food"] > 0:
-            self.inventory["food"] -= 1
-            self.attributes += Stats(hunger=-FOOD_RELIEF)
-            eaten += 1
+        eaten = {}
+        while self.attributes.hunger > 0:
+            item = self._food_to_eat()
+            if item is None:
+                break
+            self.inventory[item.id] -= 1
+            self.attributes += Stats(**item.effects)
+            eaten[item.name] = eaten.get(item.name, 0) + 1
 
-        if eaten:
-            self.totals["food_eaten"] += eaten
-            self._record("food_eaten", eaten)
-            self.note(phase, f"ate {eaten} food")
+        pieces = sum(eaten.values())
+        if pieces:
+            self.totals["food_eaten"] += pieces
+            self._record("food_eaten", pieces)
+            for name, count in eaten.items():
+                self.note(phase, f"ate {count} {name}")
 
-        return eaten
+        return pieces
 
     def apply_location(self):
         if self.current_location:

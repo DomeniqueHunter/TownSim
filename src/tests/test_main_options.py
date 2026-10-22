@@ -30,7 +30,7 @@ class MainOptionsTestCase(unittest.TestCase):
         self.save = str(Path(tmp.name) / "save.pkl")
 
     def args(self, *extra):
-        return ["--new", "--save-file", self.save, *extra]
+        return ["--new", "--save-file", self.save, "--no-items", *extra]
 
 
 class TestParsing(unittest.TestCase):

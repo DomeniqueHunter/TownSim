@@ -166,7 +166,7 @@ class Simulation:
         self.town_hall.ledger.close_day(
             self.cycle,
             alive=len(living),
-            food_stock=sum(citizen.inventory["food"] for citizen in living),
+            food_stock=sum(citizen.food_count() for citizen in living),
             died=len(died),
             new=len(newcomers),
         )
@@ -185,7 +185,7 @@ class Simulation:
         return {
             "alive": len(living),
             "deaths": self.deaths,
-            "food": sum(citizen.inventory["food"] for citizen in living),
+            "food": sum(citizen.food_count() for citizen in living),
             "revenue": sum(shop.revenue for shop in self.town_hall.shop_buildings),
         }
 

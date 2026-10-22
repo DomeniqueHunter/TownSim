@@ -146,7 +146,7 @@ class TestRunCycles(PersistenceTestCase):
 class TestCommandLine(PersistenceTestCase):
 
     def args(self, *extra):
-        return [*extra, "--save-file", str(self.path), "--no-server"]
+        return [*extra, "--save-file", str(self.path), "--no-server", "--no-items"]
 
     def test_new_then_resume(self):
         code, out, _ = run_quiet(self.args("-c", "2", "--new"))

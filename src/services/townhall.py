@@ -4,6 +4,7 @@ from buildings import Shop
 from .spiral import SpiralGrid
 from ledger import Ledger
 from graveyard import Graveyard
+from items import Catalog
 
 
 class TownHall:
@@ -24,6 +25,7 @@ class TownHall:
         self.citizens = []
         self.ledger = Ledger()
         self.graveyard = Graveyard()
+        self.catalog = Catalog()        # all items the town knows
         self.newcomers = []     # citizens who joined since the last cycle ended
 
     def _tile_is_free(self, pos:tuple) -> bool:
@@ -60,6 +62,7 @@ class TownHall:
             self.citizens.append(citizen)
             self.newcomers.append(citizen)
             citizen.ledger = self.ledger
+            citizen.catalog = self.catalog
 
     def free_home_places(self) -> int:
         """places in homes where a sim without money can live (rent 0)"""

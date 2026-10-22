@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "items": [
+    {
+      "id": "xyz",
+      "name": "Bottle of Piss",
+      "category": "food",
+      "price": 0,
+      "stock": 1,
+      "effects": { "hunger": -5, "health": 2 },
+      "deliver_to": "Maxima"
+    }
+  ]
+}

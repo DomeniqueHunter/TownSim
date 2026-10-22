@@ -124,6 +124,16 @@ def find_building(sim, query:str):
     raise QueryError(f"{len(matches)} buildings match {typed!r}: {options}. Use the address, e.g. 5,5")
 
 
+def shop_stock(shop, catalog) -> list:
+    """what a shop has for sale"""
+    stock = []
+    for offer in shop.stock.values():
+        item = catalog.get(offer.item_id)
+        stock.append({"item": offer.item_id, "name": item.name if item else offer.item_id,
+                      "price": offer.price, "quantity": offer.quantity})
+    return stock
+
+
 def location_info(person) -> dict:
     location = person.current_location
     if location is None:
@@ -366,7 +376,8 @@ def cmd_building(sim, args):
             "working_now": len(working),
         })
         if kind == "shop":
-            info.update({"food_price": building.food_price, "sold": building.sold, "revenue": building.revenue})
+            info.update({"food_price": building.food_price, "sold": building.sold, "revenue": building.revenue,
+                         "stock": shop_stock(building, sim.town_hall.catalog)})
     elif kind == "tile":
         info["owner"] = None if building.owner is None else str(building.owner.name)
     else:
@@ -390,9 +401,31 @@ def cmd_goods(sim, args):
         "total": dict(ledger.total),
         "history": list(ledger.history)[-days:],
         "food_stock": sim.totals()["food"],
-        "shops": [{"name": s.name, "price": s.food_price, "sold": s.sold, "revenue": s.revenue}
-                  for s in town_hall.shop_buildings],
+        "shops": [{"name": s.name, "price": s.food_price, "sold": s.sold, "revenue": s.revenue,
+                   "items": shop_stock(s, town_hall.catalog)} for s in town_hall.shop_buildings],
     }
+
+
+def cmd_items(sim, args):
+    """every item the town knows: what it does, where it is sold, how many pieces sims hold"""
+    town_hall = sim.town_hall
+    held = {}
+    for citizen in sim.living():
+        for item_id, count in citizen.inventory.items():
+            if count > 0:
+                held[item_id] = held.get(item_id, 0) + count
+
+    entries = []
+    for item in town_hall.catalog:
+        offers = []
+        for shop in town_hall.shop_buildings:
+            offer = shop.stock.get(item.id)
+            if offer is not None:
+                offers.append({"shop": shop.name, "price": offer.price, "quantity": offer.quantity})
+        entries.append({"id": item.id, "name": item.name, "category": item.category,
+                        "effects": dict(item.effects), "description": item.description,
+                        "offers": offers, "held": held.get(item.id, 0)})
+    return {"items": entries}
 
 
 def cmd_map(sim, args):
@@ -444,6 +477,7 @@ COMMANDS = {
     "buildings": cmd_buildings,
     "building": cmd_building,
     "goods": cmd_goods,
+    "items": cmd_items,
     "map": cmd_map,
     "snapshot": cmd_snapshot,
 }

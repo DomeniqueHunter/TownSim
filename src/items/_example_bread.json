@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "items": [
+    {
+      "id": "bread",
+      "name": "Bread",
+      "category": "food",
+      "price": 3,
+      "stock": 200,
+      "effects": { "hunger": -2 },
+      "description": "Fresh from the bakery."
+    }
+  ]
+}

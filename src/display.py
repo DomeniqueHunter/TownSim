@@ -109,7 +109,8 @@ def goods_text(goods:dict) -> str:
              console.fmt_ledger_line("today:", goods["today"]),
              console.fmt_ledger_line("total:", goods["total"])]
     for shop in goods["shops"]:
-        lines.append(f"  {shop['name']}: sold {shop['sold']} at {shop['price']}, revenue {shop['revenue']}")
+        lines.append(f"  {shop['name']}: sold {shop['sold']}, revenue {shop['revenue']}; "
+                     f"for sale: {console.fmt_offers(shop['items'])}")
     if goods["history"]:
         last = goods["history"][-1]
         lines.append(f"  last day ({last['day']}): bought {last['food_bought']}, eaten {last['food_eaten']}, "

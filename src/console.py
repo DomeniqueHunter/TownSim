@@ -10,6 +10,7 @@ Ask a running game things.
     python console.py people 20 age          20 citizens, sorted by hunger|money|name|age
     python console.py graveyard              the dead: cycle of death, name, cause (also: graveyard 50 | all)
     python console.py goods 10               food bought/eaten, money spent, wages
+    python console.py items                  every item: effects, where it is sold, how many sims hold
     python console.py map Maxima             town map, * marks where she is
     python console.py                        interactive mode
 
@@ -35,6 +36,27 @@ def num(value) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
+
+
+def fmt_quantity(quantity) -> str:
+    return "unlimited" if quantity == float("inf") else f"{quantity} left"
+
+
+def fmt_offers(offers:list) -> str:
+    """what a shop sells: food 5 (unlimited), bread 3 (200 left)"""
+    if not offers:
+        return "nothing"
+    return ", ".join(f"{o['item']} {o['price']} ({fmt_quantity(o['quantity'])})" for o in offers)
+
+
+def fmt_inventory(inventory:dict) -> str:
+    parts = [f"food {inventory.get('food', 0)}"]
+    parts += [f"{item} {count}" for item, count in sorted(inventory.items()) if item != "food" and count]
+    return ", ".join(parts)
+
+
+def fmt_effects(effects:dict) -> str:
+    return ", ".join(f"{key} {value:+d}" for key, value in effects.items()) or "-"
 
 
 def fmt_clock(clock:dict) -> str:
@@ -77,7 +99,7 @@ def fmt_npc(data:dict) -> str:
         f"  next:      {data['next']['phase']} -> {data['next']['text']}",
         f"  health {fmt_stat(stats['health'])}   stamina {fmt_stat(stats['stamina'])}   "
         f"hunger {fmt_stat(stats['hunger'])}   money {num(stats['money']['value'])}",
-        f"  inventory: food {data['inventory'].get('food', 0)}",
+        f"  inventory: {fmt_inventory(data['inventory'])}",
         f"  home:      {home['building'] + ', unit ' + str(home['unit']) if home else '-'}",
         f"  work:      {work['building'] + ' (' + work['role'] + ')' if work else '-'}",
         f"  shop:      {shop['building'] if shop else '-'}",
@@ -145,7 +167,8 @@ def fmt_building(data:dict) -> str:
                   f"  working now: {data['working_now']}",
                   f"  boss:       {data['boss'] or '-'}"]
         if kind == "shop":
-            lines += [f"  food price: {data['food_price']}",
+            lines += [f"  food price: {data['food_price'] if data['food_price'] is not None else '-'}",
+                      f"  for sale:   {fmt_offers(data['stock'])}",
                       f"  sold:       {data['sold']} food, revenue {data['revenue']}"]
     elif kind == "tile":
         lines.append(f"  owner:      {data['owner'] or '-'}")
@@ -163,6 +186,15 @@ def fmt_graveyard(data:dict) -> str:
         head += f", showing the {data['shown']} most recent ('graveyard N' or 'graveyard all' for more)"
     rows = [[grave["cycle"], grave["name"], grave["cause"]] for grave in data["graves"]]
     return head + "\n" + fmt_table(["cycle", "name", "cause"], rows)
+
+
+def fmt_items(data:dict) -> str:
+    rows = []
+    for item in data["items"]:
+        sold_at = "; ".join(f"{o['shop']} {o['price']} ({fmt_quantity(o['quantity'])})" for o in item["offers"])
+        rows.append([item["id"], item["name"], item["category"], fmt_effects(item["effects"]),
+                     sold_at or "nowhere", item["held"]])
+    return fmt_table(["id", "name", "category", "effects", "sold at", "held by sims"], rows)
 
 
 def fmt_ledger_line(label:str, counts:dict) -> str:
@@ -197,7 +229,8 @@ def fmt_goods(data:dict) -> str:
     lines = [f"goods and money  -  day {data['day']} running, {data['food_stock']} food in inventories",
              fmt_ledger_line("today:", data["today"]), fmt_ledger_line("total:", data["total"])]
     for shop in data["shops"]:
-        lines.append(f"  {shop['name']}: sold {shop['sold']} food at {shop['price']} each, revenue {shop['revenue']}")
+        lines.append(f"  {shop['name']}: sold {shop['sold']} pieces, revenue {shop['revenue']}; "
+                     f"for sale: {fmt_offers(shop['items'])}")
     if data["history"]:
         rows = [[h["day"], h["food_bought"], h["food_eaten"], h["money_spent"], h["wages_paid"],
                  h.get("food_stock", "-"), h.get("alive", "-")] for h in data["history"]]
@@ -259,6 +292,10 @@ def cmd_graveyard(client, args, out):
     out(fmt_graveyard(client.request("graveyard", *args[:1])))
 
 
+def cmd_items(client, args, out):
+    out(fmt_items(client.request("items")))
+
+
 def cmd_buildings(client, args, out):
     out(fmt_buildings(client.request("buildings")))
 
@@ -302,7 +339,7 @@ def follow(client, name:str, out=print, interval:float=0.25, max_updates=None, s
             stats = data["stats"]
             out(f"day {data['clock']['day']:<3} {data['clock']['phase'] or '-':<19} {data['action']['text']} "
                 f"at {data['location']['text']}  | money {num(stats['money']['value'])} "
-                f"hunger {stats['hunger']['value']} food {data['inventory'].get('food', 0)}")
+                f"hunger {stats['hunger']['value']} food {sum(data['inventory'].values())}")
             printed += 1
 
         for entry in data["log"]:
@@ -326,6 +363,7 @@ COMMANDS = {
     "building": (cmd_building, "<name|y,x>  details of a building"),
     "buildings": (cmd_buildings, "all buildings"),
     "people": (cmd_people, "[N] [hunger|money|name|age]  list citizens"),
+    "items": (cmd_items, "all items: what they do, where they are sold, how many sims hold"),
     "graveyard": (cmd_graveyard, "[N|all]  the dead: cycle of death, name, cause (newest first)"),
     "goods": (cmd_goods, "[days]  food bought/eaten, money spent, wages"),
     "map": (cmd_map, "[npc]  town map, marks where the npc is"),
