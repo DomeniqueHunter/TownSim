@@ -61,6 +61,25 @@ class TownHall:
             self.newcomers.append(citizen)
             citizen.ledger = self.ledger
 
+    def free_home_places(self) -> int:
+        """places in homes where a sim without money can live (rent 0)"""
+        return sum(b.max_residents - b.residents() for b in self.home_buildings if b.rent() == 0)
+
+    def place_newborn(self, baby, mother) -> bool:
+        """a baby lives with its mother if there is room in her unit, else somewhere it is free"""
+        unit = mother.home
+        if unit is not None and unit.has_room() and unit.claim(baby):
+            baby.home = unit
+            return True
+        return baby.find_place_to_live(self.list_of_buildings())
+
+    def integrate_adult(self, person) -> None:
+        """a grown up gets his shop and the first job that is free (if any)"""
+        person.find_shop(self.shop_buildings)
+        for building in self.work_buildings:
+            if building.employ(person):
+                break
+
     def collect_newcomers(self) -> list:
         """who joined since the last time this was asked (and forget them)"""
         newcomers, self.newcomers = self.newcomers, []

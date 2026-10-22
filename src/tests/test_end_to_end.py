@@ -90,7 +90,7 @@ class TestEndToEnd(unittest.TestCase):
 
         world = self.console("world")
         self.assertIn("Small Ville", world.stdout)
-        self.assertIn("1002 alive", world.stdout)
+        self.assertRegex(world.stdout, r"\d+ alive")
 
         shop = self.console("building", "Corner Shop")
         self.assertIn("food price: 5", shop.stdout)

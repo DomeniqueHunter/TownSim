@@ -30,6 +30,10 @@ ACTION_TEXT = {
 }
 
 
+# children do not work and do not shop
+CHILD_STAYS_HOME = (ActionType.GO_TO_WORK, ActionType.WORK, ActionType.GO_TO_SHOP, ActionType.SHOP)
+
+
 # ---------------------------------------------------------------- helpers
 
 def building_kind(building) -> str:
@@ -156,7 +160,10 @@ def action_info(person) -> dict:
         ActionType.LEISURE: ("a leisure place", person.leisure_spot),
     }.get(action)
     if wanted and wanted[1] is None:
-        text += f" (has no {wanted[0].split(' ', 1)[1]}, stays home)"
+        if not person.is_adult and action in CHILD_STAYS_HOME:
+            text += " (too young, stays home)"
+        else:
+            text += f" (has no {wanted[0].split(' ', 1)[1]}, stays home)"
 
     return {"type": action.name, "text": text,
             "phase": person.last_phase.name if person.last_phase else None}
@@ -201,6 +208,11 @@ def person_info(sim, person) -> dict:
                                                     "address": address_of(workplace)},
         "shop": None if person.shop is None else {"building": person.shop.name, "address": address_of(person.shop)},
         "routine": person.routine_id,
+        "adult": person.is_adult,
+        "parents": None if person.parents is None else list(person.parents),
+        "children": person.children,
+        "pregnancy": None if person.pregnancy is None else {
+            "due_cycle": person.pregnancy.due_cycle, "partner": str(person.pregnancy.partner.name)},
         "totals": dict(person.totals),
         "log": [{"day": day, "phase": phase, "text": text} for day, phase, text in person.log],
     }
@@ -230,10 +242,13 @@ def cmd_world(sim, args):
         kind = building_kind(building)
         kinds[kind] = kinds.get(kind, 0) + 1
 
+    living = sim.living()
     return {
         "town": town_hall.town_name,
         "clock": sim.clock(),
-        "population": {"alive": len(sim.living()), "deaths": sim.deaths},
+        "population": {"alive": len(living), "deaths": sim.deaths,
+                       "children": sum(1 for p in living if not p.is_adult),
+                       "pregnant": sum(1 for p in living if p.pregnancy is not None)},
         "last_cycle": sim.last_cycle(),
         "census": dict(sim.census()),
         "today": dict(ledger.today),

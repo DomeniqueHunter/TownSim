@@ -3,7 +3,8 @@ import time
 from collections import Counter
 
 from buildings import Unit
-from person import DayTime
+from person import DayTime, ActionType, ADULT_AGE
+import reproduction
 from stats import Stats
 
 
@@ -90,12 +91,17 @@ class Simulation:
             phase = self.phase
             self.town_hall.ledger.day = self.cycle + 1
 
+            relaxing = []
             for citizen in self.living():
-                citizen.action(phase)
+                if citizen.action(phase) == ActionType.LEISURE:
+                    relaxing.append(citizen)
 
             # daily business of the buildings (e.g. wages for those who work right now)
             for building in self.town_hall.work_buildings:
                 building.update(phase)
+
+            # who relaxes in the same place can meet, and mate
+            reproduction.meet(self.town_hall, relaxing, self.cycle + 1, phase)
 
             self.phase_index += 1
             if self.phase_index == len(PHASES):
@@ -129,16 +135,29 @@ class Simulation:
         return days
 
     def _end_of_day(self) -> None:
+        came_of_age = []
         for citizen in self.living():
             # the home works on you wherever you spent the day
             if citizen.home:
                 citizen.attributes += citizen.home.location_stats()
 
-            citizen.attributes += self.daily_malus
+            # children are fed by the household, only grown ups get hungry
+            if citizen.is_adult:
+                citizen.attributes += self.daily_malus
             citizen.grow_older()
+            if citizen.age == ADULT_AGE:
+                came_of_age.append(citizen)
 
             if not citizen.check():
                 self.town_hall.graveyard.bury(citizen.name, self.cycle, citizen.cause_of_death or "unknown")
+
+        # babies that are due are born (their mother must have survived the day)
+        reproduction.give_births(self.town_hall, self.cycle)
+
+        # whoever just grew up gets a shop and a job (if one is free)
+        for citizen in came_of_age:
+            if citizen.alive:
+                self.town_hall.integrate_adult(citizen)
 
         died = self.town_hall.graveyard.died_in(self.cycle)
         newcomers = self.town_hall.collect_newcomers()

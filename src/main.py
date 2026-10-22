@@ -1,4 +1,5 @@
 import argparse
+import random
 import sys
 from pathlib import Path
 
@@ -15,6 +16,10 @@ import protocol
 
 SAVE_FILE = Path(__file__).resolve().parent / "savegame.pkl"
 
+# The first sims have all ages from 0 up to this (the shortest lifespan is 90), so the
+# town does not grow old and die all at once.
+FOUNDER_MAX_AGE = 89
+
 
 def build_town() -> TownHall:
     """creates a fresh town with its citizens and buildings"""
@@ -22,12 +27,12 @@ def build_town() -> TownHall:
 
     maxima = Maxima()
 
-    minimus = Person(name="Minimus")
+    minimus = Person(name="Minimus", age=30)
     minimus.attributes += Stats(money=100)
     minimus.set_routine(1) # normal workflow, wakes up at home and sleeps at night
 
     for _ in range(1000):
-        town_hall.add_citizen(Person())
+        town_hall.add_citizen(Person(age=random.randint(0, FOUNDER_MAX_AGE)))
 
     town_hall.add_citizen(minimus)
     town_hall.add_citizen(maxima)
@@ -62,16 +67,15 @@ def build_town() -> TownHall:
     for building in town_hall.home_buildings:
         print(repr(building))
 
-    # ordinary citizens work at the factory first, then at the shop.
-    # whoever is left has no job (and no money to buy food).
+    # grown ups get a shop and a job (factory first, then the shop), children stay at home.
+    # Minimus and Maxima only get a shop. Whoever finds no job has no money to buy food.
     for person in town_hall.citizens:
-        if person is not maxima and person is not minimus:
-            if not factory.employ(person):
-                shop.employ(person)
-    print(f"employees: factory {len(factory.employees)}, shop {len(shop.employees)}")
-
-    for person in town_hall.citizens:
-        person.find_shop(town_hall.shop_buildings)
+        if person is maxima or person is minimus:
+            person.find_shop(town_hall.shop_buildings)
+        elif person.is_adult:
+            town_hall.integrate_adult(person)
+    children = sum(1 for person in town_hall.citizens if not person.is_adult)
+    print(f"employees: factory {len(factory.employees)}, shop {len(shop.employees)}, children: {children}")
 
     return town_hall
 

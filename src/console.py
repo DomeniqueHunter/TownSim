@@ -59,6 +59,12 @@ def fmt_log(entry:dict) -> str:
     return f"day {entry['day']} {entry['phase'] or '-':<18} {entry['text']}"
 
 
+def fmt_family(data:dict) -> str:
+    parents = data["parents"]
+    origin = f"parents {parents[0][:8]} and {parents[1][:8]}" if parents else "founder, no parents in town"
+    return f"{origin}, {data['children']} children"
+
+
 def fmt_npc(data:dict) -> str:
     location, action = data["location"], data["action"]
     stats, totals = data["stats"], data["totals"]
@@ -76,10 +82,14 @@ def fmt_npc(data:dict) -> str:
         f"  work:      {work['building'] + ' (' + work['role'] + ')' if work else '-'}",
         f"  shop:      {shop['building'] if shop else '-'}",
         f"  routine:   {data['routine']}",
-        f"  age:       {fmt_stat(stats['age'])} cycles (dies of old age at the end)",
+        f"  age:       {fmt_stat(stats['age'])} cycles, {'adult' if data['adult'] else 'child'}",
+        f"  family:    {fmt_family(data)}",
         f"  lifetime:  bought {totals.get('food_bought', 0)} food for {num(totals.get('money_spent', 0))}, "
         f"ate {totals.get('food_eaten', 0)} food, earned {num(totals.get('money_earned', 0))}",
     ]
+    if data["pregnancy"]:
+        lines.append(f"  pregnant:  baby due in cycle {data['pregnancy']['due_cycle']} "
+                     f"(with {data['pregnancy']['partner'][:8]})")
     if data["log"]:
         lines.append("  recent:")
         lines += [f"    {fmt_log(entry)}" for entry in data["log"]]
@@ -168,6 +178,7 @@ def fmt_world(data:dict) -> str:
     lines = [
         f"{data['town']}  -  {fmt_clock(data['clock'])}",
         f"  population: {pop['alive']} alive, {pop['deaths']} died so far",
+        f"  children:   {pop['children']} not grown up yet, {pop['pregnant']} pregnant",
         f"  last cycle: {last['cycle']} ({last['died']} died, {last['new']} new)" if last["cycle"] else
         "  last cycle: none finished yet",
         f"  where:      {census or '-'}",

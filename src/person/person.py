@@ -6,6 +6,7 @@ import uuid
 import math
 import random
 from collections import Counter, deque
+from typing import NamedTuple
 
 
 # a person tries to keep this many food items in the inventory
@@ -16,16 +17,33 @@ FOOD_RELIEF = 1
 MEAL_ACTIONS = (ActionType.WAKEUP, ActionType.GO_HOME)
 # every sim gets a random lifespan (in cycles) from this range, both ends included
 LIFESPAN_RANGE = (90, 110)
+# from this age on a sim is grown up: it gets a job, buys its own food and gets hungry.
+# Younger sims (children) stay at home and are fed by the household.
+ADULT_AGE = 18
+# only sims of these ages can mate (both ends included)
+FERTILE_AGES = (18, 50)
+
+
+class Pregnancy(NamedTuple):
+    due_cycle: int      # the baby is born at the end of this cycle
+    partner: "Person"   # the other parent
+
+
+def short_name(name) -> str:
+    """names of sims can be long (uuid), texts show the first 8 characters"""
+    return str(name)[:8]
 
 
 class Person:
 
     def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None,
-                 age:int=0, lifespan:float=None):
+                 age:int=ADULT_AGE, lifespan:float=None, parents:tuple=None):
         """
-        `age` is counted in cycles. The sim dies of old age when its age reaches
-        `lifespan`. Without a lifespan a random one from LIFESPAN_RANGE is picked,
-        math.inf means the sim never dies of old age.
+        `age` is counted in cycles, without one the sim is grown up (ADULT_AGE),
+        new born sims are made with age=0. The sim dies of old age when its age
+        reaches `lifespan`. Without a lifespan a random one from LIFESPAN_RANGE is
+        picked, math.inf means the sim never dies of old age.
+        `parents` are the names of the two parents (None for the first sims).
         """
         if age < 0:
             raise ValueError("age cannot be negative")
@@ -40,6 +58,10 @@ class Person:
 
         self.age = age
         self.lifespan = lifespan if lifespan is not None else random.randint(*LIFESPAN_RANGE)
+
+        self.parents = parents      # names of the two parents, None for the first sims
+        self.children = 0           # how many children the sim has had
+        self.pregnancy = None       # a Pregnancy while a baby is on its way
 
         self.inventory = {"food": 0}
 
@@ -71,6 +93,20 @@ class Person:
     def money(self):
         return self.attributes.money
 
+    @property
+    def is_adult(self) -> bool:
+        return self.age >= ADULT_AGE
+
+    def can_mate(self) -> bool:
+        """alive, in the fertile ages and not already expecting a child"""
+        return (self.alive and self.pregnancy is None
+                and FERTILE_AGES[0] <= self.age <= FERTILE_AGES[1])
+
+    def become_pregnant(self, due_cycle:int, partner:Person, phase:DayTime=None) -> None:
+        self.pregnancy = Pregnancy(due_cycle, partner)
+        self.note(phase, f"pregnant with the child of {short_name(partner.name)}, due in cycle {due_cycle}")
+        partner.note(phase, f"{short_name(self.name)} is expecting their child, due in cycle {due_cycle}")
+
     def grow_older(self) -> None:
         """one cycle older"""
         self.age += 1
@@ -93,6 +129,7 @@ class Person:
     def die(self, cause:str="unknown", verbose=False):
         self.alive = False
         self.cause_of_death = cause
+        self.pregnancy = None
         if verbose: print(f"sim: {self.name} died")
 
         if self.current_location:

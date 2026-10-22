@@ -11,7 +11,7 @@ from graveyard import Grave
 from persistence import save_state, load_state
 from person import Person
 from person.maxima import Maxima
-from person.person import LIFESPAN_RANGE
+from person.person import LIFESPAN_RANGE, ADULT_AGE
 
 from townhelper import make_sim
 
@@ -32,8 +32,9 @@ class TestLifespan(unittest.TestCase):
     def test_lifespans_are_whole_numbers(self):
         self.assertTrue(all(isinstance(Person().lifespan, int) for _ in range(50)))
 
-    def test_a_new_person_is_not_old(self):
-        self.assertEqual(0, Person().age)
+    def test_a_person_without_an_age_is_grown_up_and_a_baby_has_age_zero(self):
+        self.assertEqual(ADULT_AGE, Person().age)
+        self.assertEqual(0, Person(age=0).age)
 
     def test_age_and_lifespan_can_be_chosen(self):
         person = Person(age=7, lifespan=42)
@@ -61,7 +62,7 @@ class TestLifespan(unittest.TestCase):
 class TestDyingOfOldAge(unittest.TestCase):
 
     def test_grow_older(self):
-        person = Person()
+        person = Person(age=0)
         person.grow_older()
         person.grow_older()
         self.assertEqual(2, person.age)
@@ -101,20 +102,20 @@ class TestAgingInTheSimulation(unittest.TestCase):
         sim = make_sim()
         sim.run(3)
 
-        self.assertEqual([3] * 5, [p.age for p in sim.living()])        # Maxima too
+        self.assertEqual([ADULT_AGE + 3] * 5, [p.age for p in sim.living()])        # Maxima too
 
     def test_age_does_not_change_inside_a_cycle(self):
         sim = make_sim()
         for _ in range(9):
             sim.step()
-        self.assertEqual({0}, {p.age for p in sim.living()})
+        self.assertEqual({ADULT_AGE}, {p.age for p in sim.living()})
         sim.step()
-        self.assertEqual({1}, {p.age for p in sim.living()})
+        self.assertEqual({ADULT_AGE + 1}, {p.age for p in sim.living()})
 
     def test_dies_at_the_end_of_the_cycle_that_equals_its_lifespan(self):
         sim = make_sim()
         alice = named(sim, "Alice")
-        alice.lifespan = 5
+        alice.lifespan = ADULT_AGE + 5      # dies in the 5th cycle
 
         sim.run(4)
         self.assertTrue(alice.alive)
@@ -125,7 +126,7 @@ class TestAgingInTheSimulation(unittest.TestCase):
 
     def test_old_age_shows_up_in_the_cycle_numbers(self):
         sim = make_sim()
-        named(sim, "Bob").lifespan = 4
+        named(sim, "Bob").lifespan = ADULT_AGE + 4
         sim.run(4)
 
         self.assertEqual({"cycle": 4, "died": 1, "new": 0}, sim.last_cycle())
@@ -134,7 +135,7 @@ class TestAgingInTheSimulation(unittest.TestCase):
     def test_dying_of_age_frees_home_and_job(self):
         sim = make_sim()
         alice = named(sim, "Alice")
-        alice.lifespan = 2
+        alice.lifespan = ADULT_AGE + 2
         home, job = alice.home, alice.workplace
         sim.run(2)
 
@@ -146,16 +147,18 @@ class TestAgingInTheSimulation(unittest.TestCase):
         sim = make_sim()
         for person in sim.town_hall.citizens:
             if person.name != "Maxima":
-                person.lifespan = 3
+                person.lifespan = ADULT_AGE + 3
         sim.run(30)
 
         self.assertEqual(["Maxima"], [p.name for p in sim.living()])
-        self.assertEqual(30, named(sim, "Maxima").age)
+        self.assertEqual(ADULT_AGE + 30, named(sim, "Maxima").age)
         self.assertEqual({("Alice", 3, "old age"), ("Alma", 3, "old age"), ("Bob", 3, "old age"),
                           ("Dave", 3, "old age")}, set(sim.town_hall.graveyard))
 
-    def test_a_town_with_random_lifespans_dies_out_between_cycle_90_and_110(self):
-        sim = make_sim()          # Alice, Alma, Bob work, Dave has no job, Maxima is immortal
+    def test_a_town_of_grown_ups_dies_out_when_their_lifespans_run_out(self):
+        # Alice, Alma, Bob work, Dave has no job, Maxima is immortal. All are 18 at the start,
+        # so a lifespan of 90..110 ends after 72..92 cycles
+        sim = make_sim()
         sim.run(115)
 
         graves = {grave.name: grave for grave in sim.town_hall.graveyard}
@@ -164,7 +167,7 @@ class TestAgingInTheSimulation(unittest.TestCase):
         for name in ("Alice", "Alma", "Bob"):
             with self.subTest(name=name):
                 self.assertEqual("old age", graves[name].cause)
-                self.assertTrue(90 <= graves[name].cycle <= 110, graves[name])
+                self.assertTrue(90 - ADULT_AGE <= graves[name].cycle <= 110 - ADULT_AGE, graves[name])
 
         self.assertEqual(["Maxima"], [p.name for p in sim.living()])
 
@@ -193,27 +196,27 @@ class TestAgeInQueriesAndConsole(unittest.TestCase):
 
     def test_npc_has_age_and_lifespan(self):
         alice = self.ask("npc", "Alice")["stats"]["age"]
-        self.assertEqual(3, alice["value"])
+        self.assertEqual(ADULT_AGE + 3, alice["value"])
         self.assertEqual(named(self.sim, "Alice").lifespan, alice["max"])
         self.assertTrue(90 <= alice["max"] <= 110)
 
-        self.assertEqual({"value": 3, "max": math.inf}, self.ask("npc", "Maxima")["stats"]["age"])
+        self.assertEqual({"value": ADULT_AGE + 3, "max": math.inf}, self.ask("npc", "Maxima")["stats"]["age"])
 
     def test_everything_can_still_be_sent_as_json(self):
         data = self.ask("npc", "Maxima")
         self.assertEqual(math.inf, json.loads(json.dumps(data))["stats"]["age"]["max"])
 
     def test_people_show_the_age(self):
-        self.assertTrue(all(p["age"] == 3 for p in self.ask("people")["people"]))
+        self.assertTrue(all(p["age"] == ADULT_AGE + 3 for p in self.ask("people")["people"]))
 
     def test_people_sorted_by_age_oldest_first(self):
         named(self.sim, "Bob").age = 50
-        named(self.sim, "Dave").age = 20
+        named(self.sim, "Dave").age = 40
         data = self.ask("people", "3", "age")
 
         self.assertEqual("age", data["sort"])
         self.assertEqual(["Bob", "Dave"], [p["name"] for p in data["people"]][:2])
-        self.assertEqual([50, 20, 3], [p["age"] for p in data["people"]])
+        self.assertEqual([50, 40, ADULT_AGE + 3], [p["age"] for p in data["people"]])
 
     def test_the_sort_error_names_age(self):
         with self.assertRaisesRegex(queries.QueryError, "age"):
@@ -221,8 +224,8 @@ class TestAgeInQueriesAndConsole(unittest.TestCase):
 
     def test_console_npc_shows_the_age(self):
         alice = named(self.sim, "Alice")
-        self.assertIn(f"age:       3/{alice.lifespan} cycles", console.fmt_npc(self.ask("npc", "Alice")))
-        self.assertIn("age:       3/inf cycles", console.fmt_npc(self.ask("npc", "Maxima")))
+        self.assertIn(f"age:       {ADULT_AGE + 3}/{alice.lifespan} cycles, adult", console.fmt_npc(self.ask("npc", "Alice")))
+        self.assertIn(f"age:       {ADULT_AGE + 3}/inf cycles, adult", console.fmt_npc(self.ask("npc", "Maxima")))
 
     def test_console_people_table_has_an_age_column(self):
         header = console.fmt_people(self.ask("people")).splitlines()[1]
