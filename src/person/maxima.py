@@ -1,5 +1,5 @@
 
-from .person import Person
+from .person import Person, ADULT_AGE
 from stats import Attributes, Stats
 
 import math
@@ -12,8 +12,11 @@ class Maxima(Person):
         attributes += Stats(money=math.inf)  # cuz she is rich
 
         # routine 1: normal workflow, wakes up at home and sleeps at night
-        # she never dies of old age
-        super().__init__(name=name, attributes=attributes, routine=1, lifespan=math.inf)
+        # she never dies of old age and can have children at any age. The youngest age stays
+        # ADULT_AGE: nobody below that can mate, she is no exception.
+        # And she is the futa of the town (everybody else is one in a million).
+        super().__init__(name=name, attributes=attributes, routine=1, lifespan=math.inf,
+                         fertile_ages=(ADULT_AGE, math.inf), gender="futa")
 
 
 maxima = Maxima()

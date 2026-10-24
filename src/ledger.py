@@ -2,7 +2,7 @@ from collections import Counter, deque
 
 
 # things the ledger counts
-KINDS = ("food_bought", "food_eaten", "money_spent", "wages_paid")
+KINDS = ("food_bought", "food_eaten", "money_spent", "wages_paid", "leisure_spent")
 
 
 class Ledger:

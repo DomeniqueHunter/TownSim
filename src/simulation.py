@@ -39,6 +39,7 @@ class Simulation:
 
         self.cycle = 0          # number of completed days
         self.phase_index = 0    # next phase to run
+        self.couples = []       # who wants a baby today, decided at the end of the day
 
         # everybody who is in the town now is a founder, only those who
         # arrive later are "new" in the cycle they arrive
@@ -100,8 +101,8 @@ class Simulation:
             for building in self.town_hall.work_buildings:
                 building.update(phase)
 
-            # who relaxes in the same place can meet, and mate
-            reproduction.meet(self.town_hall, relaxing, self.cycle + 1, phase)
+            # who relaxes in the same place can meet. The babies are decided at the end of the day.
+            self.couples += reproduction.meet(relaxing, phase)
 
             self.phase_index += 1
             if self.phase_index == len(PHASES):
@@ -151,7 +152,10 @@ class Simulation:
             if not citizen.check():
                 self.town_hall.graveyard.bury(citizen.name, self.cycle, citizen.cause_of_death or "unknown")
 
-        # babies that are due are born (their mother must have survived the day)
+        # the couples of today compete for the free places, then babies that are due are born
+        # (their mother must have survived the day)
+        reproduction.conceive(self.town_hall, self.couples, self.cycle)
+        self.couples = []
         reproduction.give_births(self.town_hall, self.cycle)
 
         # whoever just grew up gets a shop and a job (if one is free)

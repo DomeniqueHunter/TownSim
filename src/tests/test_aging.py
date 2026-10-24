@@ -229,7 +229,7 @@ class TestAgeInQueriesAndConsole(unittest.TestCase):
 
     def test_console_people_table_has_an_age_column(self):
         header = console.fmt_people(self.ask("people")).splitlines()[1]
-        self.assertEqual(["name", "age", "location"], header.split()[:3])
+        self.assertEqual(["name", "age", "gender", "location"], header.split()[:4])
 
     def test_the_text_stays_plain_ascii(self):
         console.fmt_npc(self.ask("npc", "Maxima")).encode("ascii")

@@ -24,12 +24,22 @@ class WorkBuilding(Building):
         self.employees = []
         self.roles = {}     # person -> "office" / "worker", everybody else is a worker
 
+    @property
+    def is_hiring(self) -> bool:
+        """whether new staff makes sense here (a closed brothel pays nobody)"""
+        return True
+
     def employ(self, person:Person, role:str="worker") -> bool:
-        """hires the person, returns False if there is no place left (or already employed here)"""
+        """
+        hires the person, returns False if there is no place left, or the person already has
+        this job or another one (dismiss first to change jobs)
+        """
         if role not in WAGES:
             raise ValueError(f"unknown role {role!r}, use one of {list(WAGES)}")
 
         if person in self.employees or len(self.employees) >= self.work_places:
+            return False
+        if person.workplace is not None and person.workplace is not self:
             return False
 
         self.employees.append(person)

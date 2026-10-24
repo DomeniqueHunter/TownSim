@@ -104,6 +104,7 @@ def fmt_npc(data:dict) -> str:
         f"  work:      {work['building'] + ' (' + work['role'] + ')' if work else '-'}",
         f"  shop:      {shop['building'] if shop else '-'}",
         f"  routine:   {data['routine']}",
+        f"  gender:    {data['gender']}",
         f"  age:       {fmt_stat(stats['age'])} cycles, {'adult' if data['adult'] else 'child'}",
         f"  family:    {fmt_family(data)}",
         f"  lifetime:  bought {totals.get('food_bought', 0)} food for {num(totals.get('money_spent', 0))}, "
@@ -128,9 +129,9 @@ def fmt_table(headers:list, rows:list) -> str:
 
 
 def fmt_people(data:dict) -> str:
-    rows = [[p["name"][:8], p["age"], p["location"], (p["action"] or "-").lower(), p["hunger"],
+    rows = [[p["name"][:8], p["age"], p["gender"], p["location"], (p["action"] or "-").lower(), p["hunger"],
              num(p["money"]), p["food"], p["workplace"] or "-"] for p in data["people"]]
-    table = fmt_table(["name", "age", "location", "action", "hunger", "money", "food", "work"], rows)
+    table = fmt_table(["name", "age", "gender", "location", "action", "hunger", "money", "food", "work"], rows)
     return f"{len(rows)} of {data['total']} citizens, sorted by {data['sort']}\n{table}"
 
 
@@ -162,10 +163,14 @@ def fmt_building(data:dict) -> str:
                   f"  rent:       {data['rent']} per day, quality {data['quality']}",
                   f"  effect:     health {data['gain']['health']}, stamina {data['gain']['stamina']}, "
                   f"hunger {data['gain']['hunger']} per day"]
-    elif kind in ("work", "shop"):
+    elif kind in ("work", "shop", "brothel"):
         lines += [f"  employees:  {data['employees']}/{data['capacity']}",
                   f"  working now: {data['working_now']}",
                   f"  boss:       {data['boss'] or '-'}"]
+        if kind == "brothel":
+            lines += [f"  open:       {'yes' if data['open'] else 'no, it needs a boss'}",
+                      f"  entrance:   {data['price']} (staff pays nothing), gives {fmt_effects(data['effects'])}",
+                      f"  visits:     {data['visits']}, revenue {data['revenue']}"]
         if kind == "shop":
             lines += [f"  food price: {data['food_price'] if data['food_price'] is not None else '-'}",
                       f"  for sale:   {fmt_offers(data['stock'])}",
@@ -199,7 +204,8 @@ def fmt_items(data:dict) -> str:
 
 def fmt_ledger_line(label:str, counts:dict) -> str:
     return (f"  {label:<10} food bought {counts.get('food_bought', 0)}, eaten {counts.get('food_eaten', 0)}, "
-            f"money spent {counts.get('money_spent', 0)}, wages paid {counts.get('wages_paid', 0)}")
+            f"money spent {counts.get('money_spent', 0)}, wages paid {counts.get('wages_paid', 0)}, "
+            f"leisure spent {counts.get('leisure_spent', 0)}")
 
 
 def fmt_world(data:dict) -> str:
@@ -211,6 +217,7 @@ def fmt_world(data:dict) -> str:
         f"{data['town']}  -  {fmt_clock(data['clock'])}",
         f"  population: {pop['alive']} alive, {pop['deaths']} died so far",
         f"  children:   {pop['children']} not grown up yet, {pop['pregnant']} pregnant",
+        f"  genders:    {', '.join(f'{count} {gender}' for gender, count in pop['genders'].items())}",
         f"  last cycle: {last['cycle']} ({last['died']} died, {last['new']} new)" if last["cycle"] else
         "  last cycle: none finished yet",
         f"  where:      {census or '-'}",
@@ -258,7 +265,7 @@ def fmt_map(data:dict, mark=None, mark_name:str="") -> str:
             row.append(symbol.ljust(2) + ("*" if (y, x) == mark else " "))
         lines.append(f"{y:>4} " + "".join(row).rstrip())
     header = "     " + "".join(f"{x:<3}" if x % 5 == 0 else "   " for x in range(bounds["min_x"], bounds["max_x"] + 1))
-    legend = "TH town hall, MB mega building, MN mansion, SH shop, WB workplace, other = tile"
+    legend = "TH town hall, MB mega building, MN mansion, SH shop, BR brothel, WB workplace, other = tile"
     if mark:
         legend += f", * = {mark_name}"
     return "\n".join([header.rstrip()] + lines + ["", legend])

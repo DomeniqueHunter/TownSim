@@ -30,6 +30,7 @@ KIND_COLORS = {
     "home": "#9ecae1",
     "work": "#fdae6b",
     "shop": "#a1d99b",
+    "brothel": "#f4a6c7",
     "tile": "#e5e5e5",
     "townhall": "#bcbddc",
 }

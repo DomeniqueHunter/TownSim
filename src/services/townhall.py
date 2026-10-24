@@ -1,6 +1,7 @@
 from buildings import HomeBuilding
 from buildings import WorkBuilding
 from buildings import Shop
+from buildings import Brothel
 from .spiral import SpiralGrid
 from ledger import Ledger
 from graveyard import Graveyard
@@ -53,9 +54,8 @@ class TownHall:
         if isinstance(building, Shop):
             self.shop_buildings.append(building)
 
-        # TODO leisure
-        # if isinstance(building, LeisureBuilding):
-        #     self.leisure_buildings.append(building)
+        if isinstance(building, Brothel):
+            self.leisure_buildings.append(building)
 
     def add_citizen(self, citizen):
         if citizen not in self.citizens:
@@ -77,9 +77,18 @@ class TownHall:
         return baby.find_place_to_live(self.list_of_buildings())
 
     def integrate_adult(self, person) -> None:
-        """a grown up gets his shop and the first job that is free (if any)"""
+        """
+        A grown up gets his shop, a place to relax and, if he has no job, a place at the workplace that
+        is emptiest (fewest of its places taken, the first one of the list if equal). That way a place
+        that became free, because somebody died, is filled again soon, wherever it is.
+        """
         person.find_shop(self.shop_buildings)
-        for building in self.work_buildings:
+        person.find_leisure_spot(self.leisure_buildings)
+        if person.workplace is not None:
+            return
+
+        openings = [b for b in self.work_buildings if b.is_hiring and len(b.employees) < b.work_places]
+        for building in sorted(openings, key=lambda b: len(b.employees) / b.work_places):
             if building.employ(person):
                 break
 

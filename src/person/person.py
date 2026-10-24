@@ -19,8 +19,23 @@ LIFESPAN_RANGE = (90, 110)
 # from this age on a sim is grown up: it gets a job, buys its own food and gets hungry.
 # Younger sims (children) stay at home and are fed by the household.
 ADULT_AGE = 18
-# only sims of these ages can mate (both ends included)
+# only sims of these ages can mate (both ends included). The lower end can never be below
+# ADULT_AGE, not even for a sim with its own range (see Maxima: no upper end).
 FERTILE_AGES = (18, 50)
+
+
+# the genders. Females and futas can carry a baby, males and futas can father one.
+GENDERS = ("male", "female", "futa")
+CAN_CARRY = ("female", "futa")
+CAN_FATHER = ("male", "futa")
+# chance that a new sim is a futa, everybody else is male or female with the same chance
+FUTA_CHANCE = 1 / 1_000_000
+
+
+def random_gender(rng=random) -> str:
+    if rng.random() < FUTA_CHANCE:
+        return "futa"
+    return rng.choice(("male", "female"))
 
 
 class Pregnancy(NamedTuple):
@@ -36,18 +51,28 @@ def short_name(name) -> str:
 class Person:
 
     def __init__(self, *args, name:str=None, attributes:Attributes=None, routine:int=None,
-                 age:int=ADULT_AGE, lifespan:float=None, parents:tuple=None):
+                 age:int=ADULT_AGE, lifespan:float=None, parents:tuple=None, fertile_ages:tuple=None,
+                 gender:str=None):
         """
         `age` is counted in cycles, without one the sim is grown up (ADULT_AGE),
         new born sims are made with age=0. The sim dies of old age when its age
         reaches `lifespan`. Without a lifespan a random one from LIFESPAN_RANGE is
         picked, math.inf means the sim never dies of old age.
         `parents` are the names of the two parents (None for the first sims).
+        `fertile_ages` is the (youngest, oldest) age at which the sim can mate, FERTILE_AGES
+        without it. The youngest age cannot be below ADULT_AGE, the oldest may be math.inf.
+        `gender` is one of GENDERS, without it the sim is male or female by chance (one in
+        FUTA_CHANCE is a futa).
         """
         if age < 0:
             raise ValueError("age cannot be negative")
         if lifespan is not None and lifespan <= 0:
             raise ValueError("lifespan must be positive")
+        if gender is not None and gender not in GENDERS:
+            raise ValueError(f"gender must be one of {GENDERS}, not {gender!r}")
+        fertile_ages = tuple(fertile_ages) if fertile_ages is not None else FERTILE_AGES
+        if len(fertile_ages) != 2 or fertile_ages[0] < ADULT_AGE or fertile_ages[0] > fertile_ages[1]:
+            raise ValueError(f"fertile_ages must be (youngest, oldest) with the youngest at least {ADULT_AGE}")
 
         self.attributes = attributes or Attributes(health=(10, 10), stamina=(10, 10), hunger=(0, 10))
         self.name = name or str(uuid.uuid4())  # maybe not a nice name but we will see
@@ -57,6 +82,8 @@ class Person:
 
         self.age = age
         self.lifespan = lifespan if lifespan is not None else random.randint(*LIFESPAN_RANGE)
+        self.fertile_ages = fertile_ages
+        self.gender = gender if gender is not None else random_gender()
 
         self.parents = parents      # names of the two parents, None for the first sims
         self.children = 0           # how many children the sim has had
@@ -74,7 +101,7 @@ class Person:
         self.home = None
         self.workplace = None
         self.shop = None
-        self.leisure_spot = None    # TODO set once leisure buildings exist
+        self.leisure_spot = None    # the place to relax at, set when the sim grows up (see TownHall)
         self.current_location = None
 
         self.set_routine(routine)
@@ -97,12 +124,24 @@ class Person:
     def is_adult(self) -> bool:
         return self.age >= ADULT_AGE
 
+    @property
+    def can_carry(self) -> bool:
+        return self.gender in CAN_CARRY
+
+    @property
+    def can_father(self) -> bool:
+        return self.gender in CAN_FATHER
+
     def can_mate(self) -> bool:
         """alive, in the fertile ages and not already expecting a child"""
-        return (self.alive and self.pregnancy is None
-                and FERTILE_AGES[0] <= self.age <= FERTILE_AGES[1])
+        return (self.alive and self.pregnancy is None and self.is_adult
+                and self.fertile_ages[0] <= self.age <= self.fertile_ages[1])
 
     def become_pregnant(self, due_cycle:int, partner:Person, phase:DayTime=None) -> None:
+        if not self.can_carry:
+            raise ValueError(f"a {self.gender} cannot be pregnant")
+        if not partner.can_father:
+            raise ValueError(f"a {partner.gender} cannot be the other parent")
         self.pregnancy = Pregnancy(due_cycle, partner)
         self.note(phase, f"pregnant with the child of {short_name(partner.name)}, due in cycle {due_cycle}")
         partner.note(phase, f"{short_name(self.name)} is expecting their child, due in cycle {due_cycle}")
@@ -167,13 +206,17 @@ class Person:
         Where the person has to be for the given action.
         Falls back to home if the person has no such place (yet).
         """
+        # a leisure place only lets in who it admits (open, grown up, can pay)
+        spot = self.leisure_spot
+        if spot is not None and not spot.admits(self):
+            spot = None
         targets = {
             ActionType.GO_TO_WORK: self.workplace,
             ActionType.WORK: self.workplace,
             ActionType.GO_TO_SHOP: self.shop,
             ActionType.SHOP: self.shop,
-            ActionType.GO_TO_LEISURE: self.leisure_spot,
-            ActionType.LEISURE: self.leisure_spot,
+            ActionType.GO_TO_LEISURE: spot,
+            ActionType.LEISURE: spot,
         }
         # wake up, sleep and go home all happen at home
         return targets.get(action) or self.home
@@ -192,6 +235,8 @@ class Person:
             self.buy_food(phase)
         elif action in MEAL_ACTIONS:
             self.eat(phase)
+        elif action == ActionType.LEISURE:
+            self.relax(phase)
 
         return action
 
@@ -303,6 +348,30 @@ class Person:
                 self.note(phase, f"ate {count} {name}")
 
         return pieces
+
+    def find_leisure_spot(self, venues:list) -> bool:
+        """picks the place to relax at, returns False if there is none"""
+        self.leisure_spot = venues[0] if venues else None
+        return self.leisure_spot is not None
+
+    def relax(self, phase:DayTime=None) -> bool:
+        """
+        Relaxing at the leisure place: pays the entrance (staff pays nothing) and gets what
+        the place gives. Only works while the sim is in its leisure place and is admitted.
+        """
+        spot = self.leisure_spot
+        if spot is None or self.current_location is not spot or not spot.admits(self):
+            return False
+
+        price = spot.price_for(self)
+        if price:
+            self.attributes += Stats(money=-price)
+            self.totals["leisure_spent"] += price
+            self._record("leisure_spent", price)
+        self.attributes += Stats(**spot.effects)
+        spot.record_visit(price)
+        self.note(phase, f"visited {spot.name} for {price}" if price else f"visited {spot.name}")
+        return True
 
     def apply_location(self):
         if self.current_location:

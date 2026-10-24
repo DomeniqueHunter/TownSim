@@ -1,5 +1,5 @@
 
-from .person import Person, ADULT_AGE, FERTILE_AGES, short_name
+from .person import Person, ADULT_AGE, FERTILE_AGES, GENDERS, short_name
 from .maxima import maxima
 from .routine import routines, DayTime, ActionType
 
@@ -11,5 +11,6 @@ __all__ = [
        "ActionType",
        "ADULT_AGE",
        "FERTILE_AGES",
+       "GENDERS",
        "short_name",
     ]

@@ -24,7 +24,7 @@ class TestLedger(unittest.TestCase):
         entry = ledger.close_day(1, alive=7)
 
         self.assertEqual({"day": 1, "food_bought": 5, "food_eaten": 1, "money_spent": 0,
-                          "wages_paid": 0, "alive": 7}, entry)
+                          "wages_paid": 0, "leisure_spent": 0, "alive": 7}, entry)
         self.assertEqual(0, sum(ledger.today.values()))
         self.assertEqual(5, ledger.total["food_bought"])
         self.assertEqual([entry], list(ledger.history))

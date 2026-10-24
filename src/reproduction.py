@@ -1,11 +1,12 @@
 """
 How new sims come into the world (rules from idea.md):
 
-* Sims are genderless, any two can mate.
-* Two sims meet while they relax (LEISURE) in the same place. Until there are
-  leisure buildings that is the home they share.
-* When they mate, one of them (picked by chance) is the "mother". The baby
-  is born two cycles later.
+* Sims are male, female or (very rarely) futa. Females and futas can carry a baby, males and
+  futas can father one, so a futa can have a baby with anybody, males with females only.
+* Two sims meet while they relax (LEISURE) in the same place: in the brothel, or at home
+  with the ones they share a unit with.
+* When they mate, the one who can carry is the "mother" (a coin flip if both could).
+  The baby is born two cycles later and is male or female by chance, like everybody else.
 * A baby lives with its mother if there is room in her unit, else in another
   home it can have for free. Mating only works while there is a free place
   for every baby that is on its way.
@@ -26,36 +27,92 @@ def pregnant_count(town_hall) -> int:
     return sum(1 for citizen in town_hall.citizens if citizen.alive and citizen.pregnancy is not None)
 
 
-def meet(town_hall, people_at_leisure:list, cycle:int, phase=None, rng=random) -> int:
+def pair_roles(first, second, rng=random):
     """
-    Sims who relax at the same place are paired up at random. Each pair mates
-    with MATE_CHANCE. `cycle` is the number of the running cycle.
-    Returns the number of new pregnancies.
+    Who is the mother and who the other parent of a baby of these two, as (mother, other),
+    or None if they cannot have one together (two males, two females). The mother is the one
+    who can carry while the other can father, a coin flip if both ways work (two futas).
+    """
+    options = []
+    if first.can_carry and second.can_father:
+        options.append((first, second))
+    if second.can_carry and first.can_father:
+        options.append((second, first))
+    return rng.choice(options) if options else None
+
+
+def pair_up(group:list, rng=random) -> list:
+    """
+    Pairs the sims of one place who can have a baby together, at random: males with females
+    first, then futas with whoever is left over, then futas with each other.
+    Who finds nobody stays alone. Returns the pairs.
+    """
+    group = list(group)
+    rng.shuffle(group)
+    males = [p for p in group if p.gender == "male"]
+    females = [p for p in group if p.gender == "female"]
+    futas = [p for p in group if p.gender == "futa"]
+
+    pairs = []
+    while males and females:
+        pairs.append((males.pop(), females.pop()))
+    while futas and (males or females):
+        pairs.append((futas.pop(), (males or females).pop()))
+    while len(futas) >= 2:
+        pairs.append((futas.pop(), futas.pop()))
+    return pairs
+
+
+def meet(people_at_leisure:list, phase=None, rng=random) -> list:
+    """
+    Sims who relax at the same place find a partner they can have a baby with (see pair_up).
+    Each pair wants a baby with MATE_CHANCE. Returns those couples as (first, second, phase).
+    Nothing happens to them yet: at the end of the cycle all couples of the day compete
+    for the free places (see conceive), so it does not matter in which phase of the
+    day somebody relaxes.
     """
     groups = {}
     for person in people_at_leisure:
         if person.current_location is not None and person.can_mate():
             groups.setdefault(id(person.current_location), []).append(person)
 
-    pregnancies, room = 0, None
+    couples = []
     for group in groups.values():
         if len(group) < 2:
             continue
-        rng.shuffle(group)
+        for first, second in pair_up(group, rng):
+            if rng.random() < MATE_CHANCE:
+                couples.append((first, second, phase))
+    return couples
 
-        for first, second in zip(group[0::2], group[1::2]):
-            if rng.random() >= MATE_CHANCE:
-                continue
 
-            if room is None:        # only needed when somebody really wants a baby
-                room = town_hall.free_home_places() - pregnant_count(town_hall)
-            if room <= 0:
-                return pregnancies
+def conceive(town_hall, couples:list, cycle:int, rng=random) -> int:
+    """
+    The couples of a cycle (in random order, nobody is favoured) get a baby as long as there is
+    a free place to live for every baby on its way. Who carries it is decided by the genders
+    (see pair_roles). `cycle` is the cycle that just ended. Returns the number of new pregnancies.
+    """
+    if not couples:
+        return 0
 
-            mother, other = (first, second) if rng.random() < 0.5 else (second, first)
-            mother.become_pregnant(cycle + PREGNANCY_CYCLES, other, phase)
-            room -= 1
-            pregnancies += 1
+    couples = list(couples)
+    rng.shuffle(couples)
+    room = town_hall.free_home_places() - pregnant_count(town_hall)
+
+    pregnancies = 0
+    for first, second, phase in couples:
+        if room <= 0:
+            break
+        if not (first.can_mate() and second.can_mate()):       # one may have died in the meantime
+            continue
+        roles = pair_roles(first, second, rng)
+        if roles is None:                                       # not possible with these two
+            continue
+
+        mother, other = roles
+        mother.become_pregnant(cycle + PREGNANCY_CYCLES, other, phase)
+        room -= 1
+        pregnancies += 1
 
     return pregnancies
 

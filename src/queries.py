@@ -8,8 +8,8 @@ it takes the simulation lock so the answer always shows a consistent state.
 
 import re
 
-from buildings import Unit, HomeBuilding, WorkBuilding, Shop, Tile
-from person import ActionType
+from buildings import Unit, HomeBuilding, WorkBuilding, Shop, Brothel, Tile
+from person import ActionType, GENDERS
 from simulation import location_label
 
 
@@ -39,6 +39,8 @@ CHILD_STAYS_HOME = (ActionType.GO_TO_WORK, ActionType.WORK, ActionType.GO_TO_SHO
 def building_kind(building) -> str:
     if isinstance(building, Shop):
         return "shop"
+    if isinstance(building, Brothel):
+        return "brothel"
     if isinstance(building, WorkBuilding):
         return "work"
     if isinstance(building, HomeBuilding):
@@ -174,6 +176,10 @@ def action_info(person) -> dict:
             text += " (too young, stays home)"
         else:
             text += f" (has no {wanted[0].split(' ', 1)[1]}, stays home)"
+    elif wanted and action in (ActionType.GO_TO_LEISURE, ActionType.LEISURE) \
+            and isinstance(person.current_location, Unit):
+        # there is a leisure place, but the sim is not in it
+        text += " (too young, stays home)" if not person.is_adult else " (not let in, stays home)"
 
     return {"type": action.name, "text": text,
             "phase": person.last_phase.name if person.last_phase else None}
@@ -210,6 +216,7 @@ def person_info(sim, person) -> dict:
             "money": stat(attributes.money, attributes.max_money),
             "age": stat(person.age, person.lifespan),
         },
+        "gender": person.gender,
         "inventory": dict(person.inventory),
         "home": None if home is None else {"building": home.building.name, "unit": home.unit_number,
                                           "address": address_of(home.building)},
@@ -258,7 +265,8 @@ def cmd_world(sim, args):
         "clock": sim.clock(),
         "population": {"alive": len(living), "deaths": sim.deaths,
                        "children": sum(1 for p in living if not p.is_adult),
-                       "pregnant": sum(1 for p in living if p.pregnancy is not None)},
+                       "pregnant": sum(1 for p in living if p.pregnancy is not None),
+                       "genders": {gender: sum(1 for p in living if p.gender == gender) for gender in GENDERS}},
         "last_cycle": sim.last_cycle(),
         "census": dict(sim.census()),
         "today": dict(ledger.today),
@@ -319,6 +327,7 @@ def cmd_people(sim, args):
                 "location": location_info(p)["text"],
                 "action": p.current_action.name if p.current_action else None,
                 "age": p.age,
+                "gender": p.gender,
                 "hunger": p.attributes.hunger,
                 "money": p.money(),
                 "food": p.inventory["food"],
@@ -335,7 +344,7 @@ def building_summary(building) -> dict:
             "present": len(people_in(building))}
     if kind == "home":
         info["residents"], info["capacity"] = building.residents(), building.max_residents
-    elif kind in ("work", "shop"):
+    elif kind in ("work", "shop", "brothel"):
         info["employees"], info["capacity"] = len(building.employees), building.work_places
     return info
 
@@ -367,7 +376,7 @@ def cmd_building(sim, args):
             "gain": {"health": building.gain_stats.health, "stamina": building.gain_stats.stamina,
                      "hunger": building.gain_stats.hunger},
         })
-    elif kind in ("work", "shop"):
+    elif kind in ("work", "shop", "brothel"):
         working = [p for p in here if p.current_action == ActionType.WORK and p.workplace is building]
         info.update({
             "employees": len(building.employees),
@@ -378,6 +387,9 @@ def cmd_building(sim, args):
         if kind == "shop":
             info.update({"food_price": building.food_price, "sold": building.sold, "revenue": building.revenue,
                          "stock": shop_stock(building, sim.town_hall.catalog)})
+        elif kind == "brothel":
+            info.update({"open": building.is_open, "price": building.price, "effects": dict(building.effects),
+                         "visits": building.visits, "revenue": building.revenue})
     elif kind == "tile":
         info["owner"] = None if building.owner is None else str(building.owner.name)
     else:

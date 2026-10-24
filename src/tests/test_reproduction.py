@@ -11,9 +11,10 @@ import console
 import main
 import queries
 import reproduction
-from buildings import MegaBuilding, Mansion, WorkBuilding, Shop
+from buildings import MegaBuilding, Mansion, WorkBuilding, Shop, Brothel
 from persistence import save_state, load_state
-from person import Person, ADULT_AGE, FERTILE_AGES
+from person import Person, DayTime, ADULT_AGE, FERTILE_AGES
+from person.maxima import Maxima
 from person.person import Pregnancy
 from services import TownHall
 from simulation import Simulation
@@ -33,15 +34,32 @@ def make_town(unit_size=4, units=1, spare_places=0, jobs=10):
     return town
 
 
-def add(town, name, age=25, routine=1, grown_up_life=True):
+# who is male and who female in these tests: every couple of named sims can have a baby
+GENDER_OF = {"Ann": "female", "Bob": "male", "Carl": "male", "Dora": "female", "Mother": "female", "Other": "male"}
+
+
+def gender_of(name):
+    if name in GENDER_OF:
+        return GENDER_OF[name]
+    if name.startswith("P") and name[1:].isdigit():
+        return "female" if int(name[1:]) % 2 == 0 else "male"
+    return "female"
+
+
+def add(town, name, age=25, routine=1, grown_up_life=True, gender=None):
     """a sim that lives in the town (and works and shops if it is a grown up)"""
-    person = Person(name=name, age=age, routine=routine)
+    person = Person(name=name, age=age, routine=routine, gender=gender or gender_of(name))
     town.add_citizen(person)
     person.find_place_to_live(town.list_of_buildings())
     if grown_up_life and person.is_adult:
         town.integrate_adult(person)
     person.go(person.home)
     return person
+
+
+def mate(town, people, cycle=1, phase=None, rng=random):
+    """a day of meetings and the decision at the end of it, returns the number of pregnancies"""
+    return reproduction.conceive(town, reproduction.meet(people, phase, rng), cycle, rng)
 
 
 def always_mate():
@@ -68,7 +86,7 @@ class TestPersonRules(unittest.TestCase):
         self.assertFalse(Person(age=high + 1).can_mate())
 
     def test_a_pregnant_sim_cannot_mate_again(self):
-        mother, other = Person(), Person()
+        mother, other = Person(gender="female"), Person(gender="male")
         mother.become_pregnant(5, other)
         self.assertFalse(mother.can_mate())
         self.assertTrue(other.can_mate())
@@ -79,7 +97,7 @@ class TestPersonRules(unittest.TestCase):
         self.assertFalse(person.can_mate())
 
     def test_pregnancy_is_remembered_and_noted_for_both(self):
-        mother, other = Person(name="Ann"), Person(name="Bob")
+        mother, other = Person(name="Ann", gender="female"), Person(name="Bob", gender="male")
         mother.become_pregnant(5, other)
 
         self.assertEqual(Pregnancy(5, other), mother.pregnancy)
@@ -87,8 +105,8 @@ class TestPersonRules(unittest.TestCase):
         self.assertIn("Ann is expecting their child, due in cycle 5", other.log[-1][2])
 
     def test_a_mother_who_dies_loses_the_baby(self):
-        mother = Person()
-        mother.become_pregnant(5, Person())
+        mother = Person(gender="female")
+        mother.become_pregnant(5, Person(gender="male"))
         mother.die("old age")
         self.assertIsNone(mother.pregnancy)
 
@@ -107,7 +125,7 @@ class TestMeeting(unittest.TestCase):
         self.unit = self.ann.home
 
     def meet(self, people, cycle=1, rng=random):
-        return reproduction.meet(self.town, people, cycle, None, rng)
+        return mate(self.town, people, cycle, None, rng)
 
     def test_two_sims_who_relax_together_can_mate(self):
         with always_mate():
@@ -127,13 +145,14 @@ class TestMeeting(unittest.TestCase):
         due = (self.ann.pregnancy or self.bob.pregnancy).due_cycle
         self.assertEqual(9, due)
 
-    def test_the_mother_is_chosen_by_chance(self):
+    def test_the_mother_is_chosen_by_chance_if_both_could_carry(self):
         mothers = set()
         for seed in range(40):
-            ann, bob = add(make_town(), "Ann"), add(make_town(), "Bob")
+            ann = add(make_town(), "Ann", gender="futa")
+            bob = add(make_town(), "Bob", gender="futa")
             ann.go(self.unit), bob.go(self.unit)
             with always_mate():
-                reproduction.meet(self.town, [ann, bob], 1, None, random.Random(seed))
+                mate(self.town, [ann, bob], 1, None, random.Random(seed))
             mothers.add("Ann" if ann.pregnancy else "Bob")
         self.assertEqual({"Ann", "Bob"}, mothers)
 
@@ -185,18 +204,106 @@ class TestMeeting(unittest.TestCase):
         self.assertEqual(0, town.free_home_places())
 
         with always_mate():
-            self.assertEqual(0, reproduction.meet(town, [ann, bob], 1))
+            self.assertEqual(0, mate(town, [ann, bob], 1))
 
     def test_every_baby_on_its_way_needs_a_place(self):
         town = make_town(unit_size=2, units=3, spare_places=1)        # 3 couples and room for ONE baby
         people = [add(town, f"P{i}") for i in range(6)]
         with always_mate():
-            self.assertEqual(1, reproduction.meet(town, people, 1))
+            self.assertEqual(1, mate(town, people, 1))
 
         # and the place stays reserved until the baby is born
         with always_mate():
-            self.assertEqual(0, reproduction.meet(town, [p for p in people if p.pregnancy is None], 1))
+            self.assertEqual(0, mate(town, [p for p in people if p.pregnancy is None], 1))
         self.assertEqual(1, reproduction.pregnant_count(town))
+
+
+class TestMeetingAndDeciding(unittest.TestCase):
+    """during the day sims only meet, at the end of the day all couples compete for the free places"""
+
+    def setUp(self):
+        self.town = make_town(unit_size=4, units=1, spare_places=1)
+        self.ann = add(self.town, "Ann")
+        self.bob = add(self.town, "Bob")
+
+    def test_meeting_alone_makes_nobody_pregnant(self):
+        with always_mate():
+            couples = reproduction.meet([self.ann, self.bob], DayTime.EVENING)
+
+        self.assertEqual(1, len(couples))
+        first, second, phase = couples[0]
+        self.assertEqual({self.ann, self.bob}, {first, second})
+        self.assertEqual(DayTime.EVENING, phase)
+        self.assertIsNone(self.ann.pregnancy or self.bob.pregnancy)
+
+    def test_meeting_needs_the_chance(self):
+        with never_mate():
+            self.assertEqual([], reproduction.meet([self.ann, self.bob]))
+
+    def test_nobody_is_favoured_by_the_time_of_the_day(self):
+        # five couples, room for one baby: over many days every couple gets its turn
+        winners = set()
+        for seed in range(80):
+            town = make_town(unit_size=2, units=5, spare_places=1)
+            people = [add(town, f"P{i}") for i in range(10)]
+            couples = [(people[2 * i], people[2 * i + 1], DayTime.MORNING if i < 2 else DayTime.NIGHT) for i in range(5)]
+
+            self.assertEqual(1, reproduction.conceive(town, couples, 1, random.Random(seed)))
+            winners.add(next(i for i in range(5) if people[2 * i].pregnancy or people[2 * i + 1].pregnancy))
+
+        self.assertEqual({0, 1, 2, 3, 4}, winners)
+
+    def test_the_order_of_the_list_does_not_matter(self):
+        first_wins = 0
+        for seed in range(60):
+            town = make_town(unit_size=2, units=3, spare_places=1)
+            people = [add(town, f"P{i}") for i in range(6)]
+            couples = [(people[0], people[1], None), (people[2], people[3], None), (people[4], people[5], None)]
+            reproduction.conceive(town, couples, 1, random.Random(seed))
+            first_wins += bool(people[0].pregnancy or people[1].pregnancy)
+        self.assertTrue(10 < first_wins < 35, first_wins)       # about a third
+
+    def test_the_baby_is_due_two_cycles_after_the_cycle_that_ended(self):
+        reproduction.conceive(self.town, [(self.ann, self.bob, None)], 7)
+        self.assertEqual(9, (self.ann.pregnancy or self.bob.pregnancy).due_cycle)
+
+    def test_the_note_names_the_phase_of_the_meeting(self):
+        reproduction.conceive(self.town, [(self.ann, self.bob, DayTime.EVENING)], 3)
+        mother = self.ann if self.ann.pregnancy else self.bob
+        self.assertEqual("EVENING", mother.log[-1][1])
+
+    def test_couples_that_cannot_mate_anymore_do_not_use_up_a_place(self):
+        carl, dora = add(self.town, "Carl"), add(self.town, "Dora")
+        self.ann.die("old age")                     # died during the day
+        couples = [(self.ann, self.bob, None), (carl, dora, None)]
+
+        self.assertEqual(1, reproduction.conceive(self.town, couples, 1))
+        self.assertIsNone(self.bob.pregnancy)
+        self.assertTrue(carl.pregnancy or dora.pregnancy)
+
+    def test_nothing_to_decide(self):
+        self.assertEqual(0, reproduction.conceive(self.town, [], 1))
+
+    def test_the_list_that_is_given_stays_as_it_is(self):
+        couples = [(self.ann, self.bob, None)]
+        reproduction.conceive(self.town, couples, 1)
+        self.assertEqual([(self.ann, self.bob, None)], couples)
+
+    def test_the_simulation_collects_the_couples_and_decides_at_the_end_of_the_day(self):
+        town = make_town(unit_size=4)
+        ann, bob = add(town, "Ann"), add(town, "Bob")
+        sim = Simulation(town)
+
+        with always_mate():
+            for _ in range(7):          # up to and including the EVENING, when routine 1 relaxes
+                sim.step()
+            self.assertEqual(1, len(sim.couples))
+            self.assertIsNone(ann.pregnancy or bob.pregnancy)
+
+            sim.run_cycle()             # the rest of the day
+        self.assertEqual([], sim.couples)
+        mother = ann if ann.pregnancy else bob
+        self.assertEqual(3, mother.pregnancy.due_cycle)
 
 
 class TestPlacesAndJobs(unittest.TestCase):
@@ -323,12 +430,12 @@ class TestBirths(unittest.TestCase):
 
     def test_twins_do_not_happen_but_two_mothers_can_give_birth_in_the_same_cycle(self):
         carl, dora = add(self.town, "Carl"), add(self.town, "Dora")
-        carl.become_pregnant(3, dora)
+        dora.become_pregnant(3, carl)
         self.assertEqual(2, len(self.births(3)))
 
     def test_a_baby_without_a_home_is_still_born(self):
         town = make_town(unit_size=1, units=1)
-        mother, other = add(town, "Ann"), Person(name="Bob")
+        mother, other = add(town, "Ann"), Person(name="Bob", gender="male")
         mother.become_pregnant(3, other)
 
         (baby,) = reproduction.give_births(town, 3)
@@ -478,15 +585,25 @@ class TestFullSequence(unittest.TestCase):
 
 
 class TestGrowingTown(unittest.TestCase):
-    """the population must not die out and must stay inside what homes and jobs allow"""
+    """
+    The population must not die out and must stay inside what homes and jobs allow.
+    That needs a place where everybody meets (the brothel): to have a baby a sim needs a
+    partner of the right gender who relaxes at the same place at the same time, which
+    housemates almost never are (see test_without_a_meeting_place_a_town_dies_out).
+    """
 
-    def run_town(self, seed, founders=100, capacity=200, cycles=250):
+    def run_town(self, seed, founders=180, capacity=200, cycles=250, meeting_place=True):
         random.seed(seed)
         town = TownHall("Growville")
         town.add_building(MegaBuilding("Homes", stories=capacity // 10, persons_per_unit=10,
                                        health=1, stamina=2, hunger=0, money=0))
         town.add_building(WorkBuilding("Factory", work_places=capacity))
         town.add_building(Shop("Shop", work_places=capacity))
+        if meeting_place:
+            boss = Maxima()
+            town.add_citizen(boss)
+            boss.find_place_to_live(town.list_of_buildings())
+            town.add_building(Brothel("Club", boss=boss, work_places=capacity, price=0))
         for _ in range(founders):
             person = Person(age=random.randint(0, 89))
             town.add_citizen(person)
@@ -510,7 +627,7 @@ class TestGrowingTown(unittest.TestCase):
                 self.assertGreater(min(alive), 0, "the town died out")
                 self.assertLessEqual(max(alive), 200, "more sims than places to live")
                 self.assertGreater(births, 100)
-                self.assertGreater(alive[-1], 60)
+                self.assertGreater(alive[-1], 100)
 
                 causes = {}
                 for grave in sim.town_hall.graveyard:
@@ -521,6 +638,17 @@ class TestGrowingTown(unittest.TestCase):
     def test_everybody_has_a_home(self):
         sim, _, _ = self.run_town(13, cycles=150)
         self.assertTrue(all(p.home is not None for p in sim.living()))
+
+    def test_without_a_meeting_place_a_town_shrinks(self):
+        # measured over 8 seeds: 2 to 8 times fewer births (28 to 110 against about 230 in 120 cycles),
+        # and over 250 cycles most towns die out completely
+        for seed in (1, 2, 3):
+            with self.subTest(seed=seed):
+                _, _, with_place = self.run_town(seed, cycles=120)
+                _, alive, without = self.run_town(seed, cycles=120, meeting_place=False)
+
+                self.assertLess(without * 2, with_place)
+                self.assertLess(alive[-1], 100)                 # of 180 at the start
 
 
 class TestQueriesAndConsole(unittest.TestCase):

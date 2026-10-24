@@ -7,7 +7,7 @@ from services import TownHall
 from person import Person
 from person.maxima import Maxima
 from stats import Stats
-from buildings import MegaBuilding, Mansion, Tile, WorkBuilding, Shop
+from buildings import MegaBuilding, Mansion, Tile, WorkBuilding, Shop, Brothel
 from simulation import Simulation
 from persistence import SaveError, load_state, save_state
 from gameserver import GameServer
@@ -21,6 +21,9 @@ ITEMS_DIR = Path(__file__).resolve().parent / "items"
 # The first sims have all ages from 0 up to this (the shortest lifespan is 90), so the
 # town does not grow old and die all at once.
 FOUNDER_MAX_AGE = 89
+
+# work places of the brothel (Maxima is its boss and has one of them)
+BROTHEL_PLACES = 40
 
 
 def build_town(default_food:bool=True) -> TownHall:
@@ -58,8 +61,10 @@ def build_town(default_food:bool=True) -> TownHall:
 
     factory = WorkBuilding("Small Factory", work_places=600)
     shop = Shop("Corner Shop", work_places=300, food_price=5, default_food=default_food)
+    brothel = Brothel("Velvet Room", boss=maxima, work_places=BROTHEL_PLACES, price=10)
     town_hall.add_building(factory)
     town_hall.add_building(shop)
+    town_hall.add_building(brothel)
 
     print(town_hall)
 
@@ -72,15 +77,18 @@ def build_town(default_food:bool=True) -> TownHall:
     for building in town_hall.home_buildings:
         print(repr(building))
 
-    # grown ups get a shop and a job (factory first, then the shop), children stay at home.
-    # Minimus and Maxima only get a shop. Whoever finds no job has no money to buy food.
+    # grown ups get a shop, a place to relax (the brothel) and a job at the workplace that is emptiest
+    # (factory, shop or brothel). Children stay at home. Minimus and Maxima get no job (Maxima is the
+    # boss of the brothel). Whoever finds no job has no money to buy food.
     for person in town_hall.citizens:
         if person is maxima or person is minimus:
             person.find_shop(town_hall.shop_buildings)
+            person.find_leisure_spot(town_hall.leisure_buildings)
         elif person.is_adult:
             town_hall.integrate_adult(person)
     children = sum(1 for person in town_hall.citizens if not person.is_adult)
-    print(f"employees: factory {len(factory.employees)}, shop {len(shop.employees)}, children: {children}")
+    print(f"employees: factory {len(factory.employees)}, shop {len(shop.employees)}, "
+          f"brothel {len(brothel.employees)} (boss {brothel.boss.name}), children: {children}")
 
     return town_hall
 
