@@ -62,8 +62,12 @@ def apply_specs(sim, specs):
             shop = person = None
 
             if spec.deliver_to:
-                if spec.stock < 1:
-                    errors.append(f"{path}.stock: must be at least 1 when the item is given to a sim")
+                if spec.portion == 1:
+                    if spec.stock < 1:
+                        errors.append(f"{path}.stock: must be at least 1 when the item is given to a sim")
+                elif spec.stock < spec.portion or spec.stock % spec.portion:
+                    errors.append(f"{path}.stock: must be a whole number of pieces ({spec.portion} {spec.unit} each), "
+                                  "at least one, when the item is given to a sim")
                 try:
                     person = find_person(sim, spec.deliver_to)
                 except QueryError as error:
@@ -74,9 +78,11 @@ def apply_specs(sim, specs):
                     errors.append(f"{path}.store: {problem}" if spec.store else f"{path}: {problem}")
 
             existing = known.get(spec.id)
-            if existing is not None and (existing.category != spec.category or existing.effects != spec.effects):
+            if existing is not None and (existing.category != spec.category or existing.effects != spec.effects
+                                         or existing.unit != spec.unit or existing.portion != spec.portion):
                 errors.append(f'{path}: "{spec.id}" already exists as a {existing.category} with the effects '
-                              f'{existing.effects}, a new file must keep category and effects')
+                              f'{existing.effects}, {existing.portion} {existing.unit} per piece, '
+                              'a new file must keep category, effects, unit and portion')
             else:
                 known[spec.id] = spec.definition()
 
@@ -88,16 +94,26 @@ def apply_specs(sim, specs):
         messages = []
         for spec, shop, person in plan:
             town_hall.catalog.add(spec.definition())
+            bulk = spec.portion != 1 or spec.unit != "piece"
             if person is not None:
-                person.inventory[spec.id] = person.inventory.get(spec.id, 0) + spec.stock
-                person.note(None, f"received {spec.stock} {spec.name} as a gift")
-                messages.append(f"{spec.name}: {spec.stock} given to {short_name(person.name)}")
-            else:
-                shop.restock(spec.id, spec.price, spec.stock)
-                if spec.stock:
-                    messages.append(f"{spec.name}: +{spec.stock} at {shop.name} (price {spec.price})")
+                pieces = spec.stock // spec.portion
+                person.inventory[spec.id] = person.inventory.get(spec.id, 0) + pieces
+                person.note(None, f"received {pieces} {spec.name} as a gift")
+                if bulk:
+                    messages.append(f"{spec.name}: {pieces} pieces ({spec.stock} {spec.unit}) given to {short_name(person.name)}")
                 else:
+                    messages.append(f"{spec.name}: {pieces} given to {short_name(person.name)}")
+            else:
+                before = shop.stock.get(spec.id)
+                loose = before.loose if before is not None else 0
+                shop.restock(spec.id, spec.price, spec.stock, spec.portion)
+                if not spec.stock:
                     messages.append(f"{spec.name}: price at {shop.name} is now {spec.price}")
+                elif bulk:
+                    messages.append(f"{spec.name}: +{spec.stock} {spec.unit} = {(loose + spec.stock) // spec.portion} pieces "
+                                    f"of {spec.portion} {spec.unit} at {shop.name} (price {spec.price} per piece)")
+                else:
+                    messages.append(f"{spec.name}: +{spec.stock} at {shop.name} (price {spec.price})")
         return messages, []
 
 

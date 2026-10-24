@@ -46,7 +46,13 @@ def fmt_offers(offers:list) -> str:
     """what a shop sells: food 5 (unlimited), bread 3 (200 left)"""
     if not offers:
         return "nothing"
-    return ", ".join(f"{o['item']} {o['price']} ({fmt_quantity(o['quantity'])})" for o in offers)
+
+    def size(offer):        # only worth saying when a piece is more than one "piece"
+        if offer.get("portion", 1) == 1 and offer.get("unit", "piece") == "piece":
+            return ""
+        return f", {offer['portion']} {offer['unit']} each"
+
+    return ", ".join(f"{o['item']} {o['price']} ({fmt_quantity(o['quantity'])}{size(o)})" for o in offers)
 
 
 def fmt_inventory(inventory:dict) -> str:
@@ -198,8 +204,8 @@ def fmt_items(data:dict) -> str:
     for item in data["items"]:
         sold_at = "; ".join(f"{o['shop']} {o['price']} ({fmt_quantity(o['quantity'])})" for o in item["offers"])
         rows.append([item["id"], item["name"], item["category"], fmt_effects(item["effects"]),
-                     sold_at or "nowhere", item["held"]])
-    return fmt_table(["id", "name", "category", "effects", "sold at", "held by sims"], rows)
+                     f"{item['portion']} {item['unit']}", sold_at or "nowhere", item["held"]])
+    return fmt_table(["id", "name", "category", "effects", "piece", "sold at", "held by sims"], rows)
 
 
 def fmt_ledger_line(label:str, counts:dict) -> str:

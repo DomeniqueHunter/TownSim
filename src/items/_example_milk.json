@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "items": [
+    {
+      "id": "milk",
+      "name": "Milk bottle",
+      "category": "food",
+      "price": 2,
+      "unit": "l",
+      "portion": 1,
+      "stock": 1000000,
+      "effects": { "hunger": -2, "health": 1 },
+      "description": "Delivered in tankers of 1,000,000 litres, sold in bottles of 1 litre."
+    }
+  ]
+}

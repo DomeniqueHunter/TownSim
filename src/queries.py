@@ -132,7 +132,8 @@ def shop_stock(shop, catalog) -> list:
     for offer in shop.stock.values():
         item = catalog.get(offer.item_id)
         stock.append({"item": offer.item_id, "name": item.name if item else offer.item_id,
-                      "price": offer.price, "quantity": offer.quantity})
+                      "price": offer.price, "quantity": offer.quantity,
+                      "portion": offer.portion, "unit": item.unit if item else "piece", "loose": offer.loose})
     return stock
 
 
@@ -433,9 +434,11 @@ def cmd_items(sim, args):
         for shop in town_hall.shop_buildings:
             offer = shop.stock.get(item.id)
             if offer is not None:
-                offers.append({"shop": shop.name, "price": offer.price, "quantity": offer.quantity})
+                offers.append({"shop": shop.name, "price": offer.price, "quantity": offer.quantity,
+                               "loose": offer.loose})
         entries.append({"id": item.id, "name": item.name, "category": item.category,
                         "effects": dict(item.effects), "description": item.description,
+                        "unit": item.unit, "portion": item.portion,
                         "offers": offers, "held": held.get(item.id, 0)})
     return {"items": entries}
 

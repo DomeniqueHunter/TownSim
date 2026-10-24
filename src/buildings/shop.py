@@ -11,12 +11,25 @@ if TYPE_CHECKING:
 
 
 class Offer:
-    """one thing a shop has for sale: how much it costs and how many pieces are left"""
+    """
+    One thing a shop has for sale: what a piece costs and how many pieces are left.
 
-    def __init__(self, item_id:str, price:int, quantity:float):
+    The shop does not hold a million bottles, it holds a number. A delivery is counted in units
+    (litres, say) and is split into pieces of `portion` units, whatever does not make a whole piece
+    waits in `loose` for the next delivery. `quantity` is the number of whole pieces.
+    """
+
+    def __init__(self, item_id:str, price:int, quantity:float, portion:int=1, loose:int=0):
         self.item_id = item_id
         self.price = price
-        self.quantity = quantity        # math.inf: never runs out
+        self.quantity = quantity        # pieces that can be bought, math.inf: never runs out
+        self.portion = portion          # units in one piece
+        self.loose = loose              # units that are not enough for a piece yet
+
+    @property
+    def units(self) -> float:
+        """everything that is left, in units"""
+        return self.quantity if self.quantity == math.inf else self.quantity * self.portion + self.loose
 
     def __repr__(self):
         return f"Offer({self.item_id}, price {self.price}, {self.quantity} left)"
@@ -54,16 +67,22 @@ class Shop(WorkBuilding):
             raise ValueError("this shop does not sell the plain food")
         offer.price = price
 
-    def restock(self, item_id:str, price:int, quantity:int) -> Offer:
+    def restock(self, item_id:str, price:int, amount:int, portion:int=1) -> Offer:
         """
-        Puts `quantity` pieces on the shelf. A new item is added, for an item
-        the shop has already the price is replaced and the pieces are added.
+        Puts a delivery of `amount` units on the shelf, split into pieces of `portion` units
+        (the price is per piece). A new item is added, for an item the shop has already the
+        price is replaced and the delivery is added to what is there (the portion cannot change).
         """
         offer = self.stock.get(item_id)
         if offer is None:
-            offer = self.stock[item_id] = Offer(item_id, price, 0)
+            offer = self.stock[item_id] = Offer(item_id, price, 0, portion)
+        elif offer.portion != portion:
+            raise ValueError(f"{item_id} is sold in pieces of {offer.portion} units here, not {portion}")
+
         offer.price = price
-        offer.quantity += quantity
+        if offer.quantity != math.inf:          # a shelf that never runs out stays that way
+            pieces, offer.loose = divmod(offer.loose + amount, portion)
+            offer.quantity += pieces
         return offer
 
     def sell(self, person:Person, item_id:str, amount:int) -> int:

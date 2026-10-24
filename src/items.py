@@ -18,10 +18,11 @@ FORMAT_VERSION = 1
 
 ID_PATTERN = re.compile(r"[a-z][a-z0-9_-]{0,39}")
 NAME_MAX = 60
+UNIT_MAX = 20
 
 EFFECT_KEYS = ("health", "stamina", "hunger")
 
-COMMON_FIELDS = ("id", "name", "category", "price", "stock", "description", "store", "deliver_to")
+COMMON_FIELDS = ("id", "name", "category", "price", "stock", "description", "store", "deliver_to", "unit", "portion")
 # what a category adds to the common fields (more categories will come)
 CATEGORY_FIELDS = {"food": ("effects",)}
 CATEGORIES = tuple(CATEGORY_FIELDS)
@@ -35,6 +36,8 @@ class ItemDef:
     category: str
     effects: dict           # what one piece does to the sim that uses it
     description: str = ""
+    unit: str = "piece"     # what deliveries are counted in, for example "l" or "kg"
+    portion: int = 1        # how many units make one piece, the thing a sim buys, holds and eats
 
 
 # the food every shop sells from the start (unless it is started without)
@@ -76,9 +79,12 @@ class ItemSpec:
     description: str = ""
     store: str = None           # name of the shop, None: the first shop
     deliver_to: str = None      # name of a sim who gets the pieces directly
+    unit: str = "piece"         # `stock` is counted in these ...
+    portion: int = 1            # ... and this many of them make one piece
 
     def definition(self) -> ItemDef:
-        return ItemDef(self.id, self.name, self.category, dict(self.effects), self.description)
+        return ItemDef(self.id, self.name, self.category, dict(self.effects), self.description,
+                       self.unit, self.portion)
 
     def target(self):
         """where the pieces go, used to find items that are listed twice"""
@@ -236,6 +242,14 @@ def check_item(raw, path:str):
         if not isinstance(value, str):
             return f"must be text, got {show(value)}"
 
+    def check_unit(value):
+        if not (isinstance(value, str) and 1 <= len(value.strip()) and len(value) <= UNIT_MAX):
+            return f"must be text with 1 to {UNIT_MAX} characters, got {show(value)}"
+
+    def check_portion(value):
+        if not whole(value) or value < 1:
+            return f"must be a whole number >= 1, got {show(value)}"
+
     def check_name_of_target(value):
         if not (isinstance(value, str) and value.strip()):
             return f"must be a name (text), got {show(value)}"
@@ -248,6 +262,8 @@ def check_item(raw, path:str):
     description = optional("description", check_text)
     store = optional("store", check_name_of_target)
     deliver_to = optional("deliver_to", check_name_of_target)
+    unit = optional("unit", check_unit)
+    portion = optional("portion", check_portion)
     if "store" in raw and "deliver_to" in raw:
         errors.append(f'{path}: use either "store" or "deliver_to", not both')
 
@@ -261,7 +277,9 @@ def check_item(raw, path:str):
     return ItemSpec(id=item_id, name=name.strip(), category=category, price=price, stock=stock,
                     effects=effects, description=description or "",
                     store=store.strip() if store else None,
-                    deliver_to=deliver_to.strip() if deliver_to else None), []
+                    deliver_to=deliver_to.strip() if deliver_to else None,
+                    unit=unit.strip() if unit else "piece",
+                    portion=portion if portion is not None else 1), []
 
 
 def check_food_effects(raw, path:str, errors:list) -> dict:

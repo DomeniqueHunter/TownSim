@@ -45,7 +45,7 @@ class TestQueries(unittest.TestCase):
         bread = items["bread"]
         self.assertEqual(("Bread", "food", {"hunger": -2}, "fresh"),
                          (bread["name"], bread["category"], bread["effects"], bread["description"]))
-        self.assertEqual([{"shop": "Shop", "price": 3, "quantity": 200}], bread["offers"])
+        self.assertEqual([{"shop": "Shop", "price": 3, "quantity": 200, "loose": 0}], bread["offers"])
         self.assertEqual(2, bread["held"])
         self.assertEqual([], items["golden_apple"]["offers"])
         self.assertEqual(1, items["golden_apple"]["held"])
@@ -143,7 +143,7 @@ class TestConsole(unittest.TestCase):
         text = self.out("items")
         lines = text.splitlines()
 
-        self.assertEqual(["id", "name", "category", "effects", "sold", "at", "held", "by", "sims"], lines[0].split())
+        self.assertEqual(["id", "name", "category", "effects", "piece", "sold", "at", "held", "by", "sims"], lines[0].split())
         self.assertEqual(5, len(lines))
         bread = next(line for line in lines if line.startswith("bread"))
         self.assertIn("Bread", bread)

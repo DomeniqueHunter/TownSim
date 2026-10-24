@@ -148,7 +148,7 @@ class TestEndToEnd(unittest.TestCase):
         self.assertRegex(self.consumed("bread")[0], r"^_consumed_bread_\d+\.json$")
         items = self.console("items")
         self.assertEqual(0, items.returncode, items.stderr)
-        self.assertRegex(items.stdout, r"bread\s+Bread\s+food\s+hunger -2\s+Corner Shop 3 \(\d+ left\)")
+        self.assertRegex(items.stdout, r"bread\s+Bread\s+food\s+hunger -2\s+1 piece\s+Corner Shop 3 \(\d+ left\)")
         shop = self.console("building", "Corner Shop")
         self.assertIn("bread 3 (", shop.stdout)
 
@@ -156,6 +156,26 @@ class TestEndToEnd(unittest.TestCase):
         def pieces_left():
             return next(i for i in self.client.request("items")["items"] if i["id"] == "bread")["offers"][0]["quantity"]
         self.wait_for(lambda: pieces_left() < 100000, "the sims buy the bread")
+
+    def test_a_tanker_of_milk_is_split_into_bottles(self):
+        self.wait_for(self.items_dir.is_dir, "the game makes the items folder")
+        (self.items_dir / "milk.json").write_text(json.dumps({"format": 1, "items": [
+            {"id": "milk", "name": "Milk bottle", "category": "food", "price": 2, "unit": "l", "portion": 1,
+             "stock": 1000000, "effects": {"hunger": -2}}]}))
+
+        self.wait_for(lambda: self.consumed("milk"), "the file is taken over")
+
+        items = self.console("items")
+        self.assertEqual(0, items.returncode, items.stderr)
+        self.assertRegex(items.stdout, r"milk\s+Milk bottle\s+food\s+hunger -2\s+1 l\s+Corner Shop 2 \(\d+ left\)")
+        shelf = self.console("building", "Corner Shop")
+        self.assertRegex(shelf.stdout, r"milk 2 \(\d+ left, 1 l each\)")
+
+        # the sims buy bottles out of the tanker, one number goes down
+        def litres_left():
+            offers = next(i for i in self.client.request("items")["items"] if i["id"] == "milk")["offers"]
+            return offers[0]["quantity"]
+        self.wait_for(lambda: litres_left() < 1000000, "the sims buy milk")
 
     def test_an_invalid_file_stays_until_it_is_fixed(self):
         self.wait_for(self.items_dir.is_dir, "the game makes the items folder")

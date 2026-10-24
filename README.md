@@ -99,11 +99,14 @@ A sim made without an age is grown up (18), babies are made with `age=0`.
 
 Rules (from `idea.md`, the numbers can be changed in `person/person.py` and `reproduction.py`):
 
-- Sims are genderless, any two can mate. They have to be **18 to 50** (`FERTILE_AGES`) and not already expecting a child.
-- Two sims **meet while they relax (LEISURE) in the same place**. Until there are leisure buildings that is the
-  home they share, so somebody who lives alone (Maxima in her Villa) never has children. Sims who relax
-  together are paired up at random, every pair mates with a chance of 20% (`MATE_CHANCE`).
-- One of the two is picked by chance as the "mother". The baby is born **2 cycles later** (`PREGNANCY_CYCLES`),
+- Sims are **male, female or futa** (see Genders below). To mate a sim has to be **18 to 50** (`FERTILE_AGES`) and not
+  already expecting a child, and the two need to be a pair that can have a baby together.
+- Two sims **meet while they relax (LEISURE) in the same place**: in the brothel, which is the leisure place of
+  every grown up, or at home with the ones they share a unit with if they have no leisure place or are not let
+  in. Sims who relax together are paired up at random, and every pair wants a baby with a chance of 20%
+  (`MATE_CHANCE`). **All couples of a day compete at the end of the cycle**, in random order, for the free
+  places (so it does not matter at which time of the day somebody relaxes).
+- The one who can carry the baby is the "mother" (a coin flip if both could). The baby is born **2 cycles later** (`PREGNANCY_CYCLES`),
   at the end of the cycle. If the mother dies before that, the baby is lost.
 - Mating only works while there is a free place to live (rent 0) for every baby on its way. The baby lives
   with its mother if her unit has room, else in another free home.
@@ -160,11 +163,13 @@ that do not end in `.json` are ignored.
 | `name` | yes | the shown name, 1 to 60 characters |
 | `category` | yes | `food` (more categories will come) |
 | `price` | yes | whole number >= 0, money per piece |
-| `stock` | yes | whole number >= 0, pieces added |
+| `stock` | yes | whole number >= 0, how much is delivered, counted in `unit`s (pieces if there is no `unit`/`portion`) |
 | `effects` | for food | what one piece does when eaten: `hunger`, `health`, `stamina`, whole numbers. A food has to lower hunger (`hunger` negative) |
 | `description` | no | free text |
 | `store` | no | name of the shop that gets the pieces, default: the first shop |
-| `deliver_to` | no | name of a sim: the pieces go straight into his inventory, not into a shop. `stock` must be at least 1. Cannot be combined with `store` |
+| `deliver_to` | no | name of a sim: the pieces go straight into his inventory, not into a shop. `stock` must be at least 1 whole piece. Cannot be combined with `store` |
+| `unit` | no | what `stock` is counted in, for example `l` or `kg`, 1 to 20 characters. Default `piece` |
+| `portion` | no | whole number >= 1, how many `unit`s make one **piece**, which is what a sim buys, holds and eats. Default 1 |
 
 Rules:
 
@@ -193,4 +198,102 @@ What the sims do with items:
   you drop the first items. Without that flag the plain food is always there.
 - `console.py items` lists every item with effects, where it is sold and how many pieces sims hold, `console.py building
   "Corner Shop"` shows the shelf, `console.py npc <name>` the inventory.
+
+**A town needs a place where everybody meets.** Without one, sims only meet the ones they live with, and a baby needs a
+male and a female (or a futa) of fertile age who relax in the same unit in the same phase, which almost never
+happens: in tests such towns had 2 to 8 times fewer births and most died out within 250 cycles. With the brothel
+as the meeting place the demo town holds its population (about 980) for hundreds of cycles. So the town depends on
+its brothel being open: without a living boss nobody is let in, and without a meeting place the births stop.
+
+
+## The brothel
+
+`Brothel` (`buildings/brothel.py`) is a workplace and the first leisure place of the town. The demo town has one,
+the "Velvet Room", with **Maxima as its boss**.
+
+- **Needs a boss.** `Brothel("Name", boss=somebody)` fails without one. The boss works there (boss wage 100) and
+  the brothel is **open only while it has a living boss**. If the boss dies, nobody is let in and nobody is paid
+  until `club.appoint_boss(somebody)` names a new one.
+- **Grown ups only.** Only sims of 18 and older can work there (`employ` refuses children), are let in, or can be the boss.
+  A sim has one job: somebody who already works elsewhere cannot be employed here as well.
+- **Work.** New grown ups are hired at the workplace that is **emptiest** (fewest of its places taken, `TownHall.integrate_adult`),
+  and a closed brothel is skipped. So the brothel is staffed like the factory and the shop (about 85 percent of its 40 places
+  in the demo town for hundreds of cycles), and a place that became free is filled again soon. Normal wage of a worker.
+- **Enjoying.** Every grown up gets the brothel as his leisure place (`TownHall.integrate_adult`). In the
+  LEISURE phase he goes there if he can pay the entrance (`price`, default 10, the staff and the boss pay nothing),
+  otherwise he stays home. A visit gives `effects` (default `stamina +2`). The money is booked as `leisure_spent`
+  (`console.py goods`) and is the revenue of the building. Children never go there.
+- **Meeting.** It is where grown ups meet while they relax, see Reproduction above.
+- `console.py building "Velvet Room"` shows boss, open or closed, entrance, visits and revenue.
+
+Maxima can have children at **every age from 18 on**: `Person(fertile_ages=(youngest, oldest))`, for Maxima
+`(18, infinity)`, for everybody else `FERTILE_AGES = (18, 50)`. The youngest age can never be below 18, for nobody:
+`Person` refuses such a range and `can_mate` always asks for a grown up. With the fair decision at the end of the
+cycle Maxima had 19 and 25 children in 400 cycles of the demo town (two runs).
+
+Old save files do not fit anymore (the save format changed), start once with `--new`.
+
+
+## Genders
+
+Every sim is `male`, `female` or `futa` (`Person.gender`, chosen by chance when the sim is made: a futa with a
+chance of 1 in 1,000,000, otherwise male or female with the same chance; a baby is made like any other sim, a futa
+is not passed on). **Maxima is the futa of the town**, whatever the chance.
+
+- Females and futas can **carry** a baby, males and futas can **father** one.
+- So a pair can have a baby if one of them can carry and the other can father: male + female, futa + male,
+  futa + female, futa + futa. Two males or two females cannot.
+- The **mother** is the one who carries: the female in a male + female pair, the futa when the partner is male,
+  the female when the partner is a futa (the futa is the other parent then), a coin flip for two futas.
+- Sims who relax in the same place are paired up so that as many pairs as possible can have a baby: males with
+  females first, then futas with whoever is left over, then futas with each other.
+- `Person.become_pregnant` refuses a male, and a partner who cannot father, so the rule cannot be bypassed.
+- `console.py npc <name>` shows the gender, `console.py people` has a gender column, `console.py world` counts them.
+
+`idea.md` still says "People are genderless", this section replaces that rule.
+
+Old save files do not fit anymore (the save format changed), start once with `--new`.
+
+
+### Bulk deliveries: tankers of milk, sold in bottles
+
+You do not have to make a file for every bottle. A delivery is counted in **units** (`unit`, for example litres) and
+the shop splits it into **pieces** of `portion` units. `price` and `effects` are per piece. A tanker of milk:
+
+```json
+{
+  "format": 1,
+  "items": [
+    {
+      "id": "milk",
+      "name": "Milk bottle",
+      "category": "food",
+      "price": 2,
+      "unit": "l",
+      "portion": 1,
+      "stock": 1000000,
+      "effects": { "hunger": -2, "health": 1 },
+      "description": "Delivered in tankers of 1,000,000 litres, sold in bottles of 1 litre."
+    }
+  ]
+}
+```
+
+(`src/items/_example_milk.json`.) The shop holds **one number** (1,000,000 litres), not a million bottles, and sells
+whole pieces out of it. A sim holds bottles in his inventory. For half litre bottles count in millilitres:
+`"unit": "ml", "portion": 500, "stock": 1000000000`.
+
+- A delivery that does not make whole pieces keeps the rest: 10 litres in pieces of 3 are 3 pieces and 1 litre waits
+  for the next delivery (`console.py items` shows `1 l` or `250 ml` in the column `piece`, `console.py building <shop>`
+  shows `milk 2 (1000000 left, 1 l each)`).
+- A second delivery of the same item is added to what is on the shelf and sets the new price. `unit` and `portion` are
+  part of what the item is and cannot change (like `category` and `effects`).
+- A gift (`deliver_to`) has to be whole pieces: `stock` a multiple of `portion`.
+- **Nothing is created.** Every unit that is delivered is on the shelf, in the inventory of a sim or eaten
+  (there is a test that counts it). What still comes out of thin air: the plain food of the shop (unlimited, start with
+  `--empty-shops` to switch it off) and the wages.
+- **Supplying the game from another program:** it only has to write the JSON file into the items folder. Write it under a
+  name that starts with `_` or `.` (or does not end in `.json`) and rename it to `something.json` when it is complete,
+  or just write it directly: the game waits until the file has not changed for a second. Every file that was taken
+  over stays in the folder as `_consumed_<name>_<timestamp>.json`, so the folder is also a record of what was delivered.
 
