@@ -564,9 +564,10 @@ class TestInTheTown(unittest.TestCase):
                 sim = Simulation(town)
 
                 low = len(sim.living())
-                for _ in range(250):
-                    sim.run_cycle()
-                    low = min(low, len(sim.living()))
+                with mock.patch.object(reproduction, "MATE_CHANCE", 0.2):     # the chance this town was measured with
+                    for _ in range(250):
+                        sim.run_cycle()
+                        low = min(low, len(sim.living()))
 
                 self.assertGreater(len(sim.living()), 100)
                 self.assertGreater(low, 60)

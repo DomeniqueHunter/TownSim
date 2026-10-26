@@ -103,13 +103,14 @@ Rules (from `idea.md`, the numbers can be changed in `person/person.py` and `rep
   already expecting a child, and the two need to be a pair that can have a baby together.
 - Two sims **meet while they relax (LEISURE) in the same place**: in the brothel, which is the leisure place of
   every grown up, or at home with the ones they share a unit with if they have no leisure place or are not let
-  in. Sims who relax together are paired up at random, and every pair wants a baby with a chance of 20%
-  (`MATE_CHANCE`). **All couples of a day compete at the end of the cycle**, in random order, for the free
+  in. Sims who relax together are paired up at random, and every pair wants a baby with a chance of 9%
+  (`MATE_CHANCE`, see "Growth, food and housing" for how it was chosen). **All couples of a day compete at the end of the cycle**, in random order, for the free
   places (so it does not matter at which time of the day somebody relaxes).
 - The one who can carry the baby is the "mother" (a coin flip if both could). The baby is born **2 cycles later** (`PREGNANCY_CYCLES`),
   at the end of the cycle. If the mother dies before that, the baby is lost.
-- Mating only works while there is a free place to live (rent 0) for every baby on its way. The baby lives
-  with its mother if her unit has room, else in another free home.
+- A baby lives with its mother if her unit has room, else in another free home. A town with the default rules only
+  makes a baby while there is a free place for it (`TownHall(babies_need_homes=True)`); the demo town does not need
+  one (it builds houses, see below) and its babies can be born homeless.
 - The baby is a normal sim: age 0, a random lifespan of 90 to 110 cycles, a random routine, a random name.
   It counts as `new` in the log line of the cycle it is born in.
 
@@ -117,13 +118,12 @@ Children and grown ups:
 
 - Under 18 a sim is a child: it stays at home all day, has no job and no shop, and **does not get hungry**
   (the household feeds it, this is a simplification, children cost nothing).
-- At 18 the sim gets a shop and the first free job (factory first, then the shop). **This happens once.**
-  If no job is free the sim has no income and starves after 10 days. Nobody is hired later, so the number
-  of jobs limits the population together with the number of homes.
+- At 18 the sim gets a shop and a job at the workplace that is emptiest. **This happens once.** If no job is free the
+  sim has no income and starves after 10 days, unless the town makes its workplaces grow (`TownHall(grow_jobs=True)`,
+  the demo town does it: the biggest workplace gets one more place).
 
 The demo town (`main.py`) starts with 1000 sims of all ages from 0 to 89, so it does not grow old all at once.
-In a 400 cycle test it first drops to about 650 sims (the oldest die while the first babies grow up) and then
-holds at about 950 to 990 with 8 to 12 births and deaths per cycle. The limit is the number of homes.
+What limits its population is food, not homes or jobs: see the next section.
 `console.py npc <name>` shows age, parents, number of children and a pregnancy, `console.py world` the number
 of children and pregnancies.
 
@@ -195,7 +195,7 @@ What the sims do with items:
 - At home (waking up, coming home) he eats until not hungry: the food with the biggest relief that is not wasted first.
   Each piece also does its other `effects` (health, stamina). Pieces that do not lower hunger are never eaten.
 - `python main.py --new --empty-shops`: the shop starts without the plain food, so sims starve after 10 days until
-  you drop the first items. Without that flag the plain food is always there.
+  you drop the first items. Without that flag the shop gets a daily ration of plain food (`--food-per-cycle`, default 1200).
 - `console.py items` lists every item with effects, where it is sold and how many pieces sims hold, `console.py building
   "Corner Shop"` shows the shelf, `console.py npc <name>` the inventory.
 
@@ -290,10 +290,52 @@ whole pieces out of it. A sim holds bottles in his inventory. For half litre bot
   part of what the item is and cannot change (like `category` and `effects`).
 - A gift (`deliver_to`) has to be whole pieces: `stock` a multiple of `portion`.
 - **Nothing is created.** Every unit that is delivered is on the shelf, in the inventory of a sim or eaten
-  (there is a test that counts it). What still comes out of thin air: the plain food of the shop (unlimited, start with
-  `--empty-shops` to switch it off) and the wages.
+  (there is a test that counts it). What still comes out of thin air: the daily ration of plain food of the shop (1200 pieces a cycle by
+  default, `--empty-shops` or `--food-per-cycle 0` switch it off) and the wages.
 - **Supplying the game from another program:** it only has to write the JSON file into the items folder. Write it under a
   name that starts with `_` or `.` (or does not end in `.json`) and rename it to `something.json` when it is complete,
   or just write it directly: the game waits until the file has not changed for a second. Every file that was taken
   over stays in the folder as `_consumed_<name>_<timestamp>.json`, so the folder is also a record of what was delivered.
+
+
+## Growth, food and housing
+
+The demo town is set up so that its population grows slowly and **only food limits it**:
+
+- **Babies need no free home.** A baby that finds no place is born homeless. Every cycle the homeless look for a free
+  place, and when **20 or more** are left without one (`HOMELESS_TO_BUILD` in `services/townhall.py`) the **town builds a
+  house** ("Housing 1", "Housing 2", ...): it is ready 3 cycles later (`BUILD_CYCLES`), appears on the next free field of
+  the map, has 100 free places (20 stories of 5) and the homeless move in. One house is built at a time. The log shows it:
+  `town: building Housing 1 for 23 homeless sims, ready in cycle 9`.
+- **Jobs grow with the town.** A grown up who finds every workplace full makes the biggest one bigger by a place.
+- **Food is the limit.** The shop gets a **daily ration** of plain food (`FOOD_PER_CYCLE = 1200` in `main.py`, change it
+  with `--food-per-cycle N` for a new town, `--unlimited-food` takes the limit away). The ration arrives in ten equal parts
+  over the day and the shelf holds one ration at the most. Grown ups need one piece a day, children need none. Whoever
+  finds the shelf empty gets hungry and dies after 10 days. The sims act in a random order in every phase, so nobody is
+  always first at the shop. More food from files (`items/`) raises the limit.
+- **Slow growth: `MATE_CHANCE = 0.09`.** Measured on the demo town with unlimited food (1002 sims, two seeds each):
+
+  | chance | population after 250 cycles |
+  |---|---|
+  | 0.06 and less | the town shrinks (about 400 after 150 cycles) |
+  | 0.08 | stays as it is (950 to 1000) |
+  | 0.09 | 2027 and 2586, about 2 to 2.6 times as many |
+  | 0.095 | 2706 and 3442 |
+  | 0.10 | doubles in 150 cycles and speeds up |
+
+  With the ration of 1200 and the chance of 0.09 (400 cycles, two seeds): the number of grown ups grows from about 820 to
+  1200 to 1300 in 150 cycles, then the ration holds it at about 1300 to 1400. The whole population keeps growing, but only
+  slowly (1666 to 1903 and 1709 to 1928 between cycle 200 and 400), because children need no food and are still born.
+  In that phase 6 to 8 sims die of hunger per cycle, and nobody stays without a home for long.
+
+Statistics:
+
+- `console.py world` shows the homeless (and how many of them are children), the log line has `homeless N`, and the
+  daily history keeps the number for every day.
+- `console.py money [days]` shows the **minimum, maximum and average money of the grown ups** now and for each of the last
+  days (at the end of the day), plus what a grown up earned and spent per day on average. **Maxima is not counted**
+  (unlimited money), and neither are the children (they never have money, they would only pull the minimum to 0).
+
+Towns made without these rules (`TownHall(...)` with its defaults, as in most tests) still have the old ones: a baby needs a
+free home, jobs do not grow, nobody builds. Old save files do not fit anymore, start once with `--new`.
 

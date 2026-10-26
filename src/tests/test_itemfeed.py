@@ -596,11 +596,31 @@ class TestOptionsOfMain(unittest.TestCase):
         shop = load_state(self.save).town_hall.shop_buildings[0]
         self.assertEqual({}, shop.stock)
 
-    def test_the_default_is_a_shop_with_food(self):
+    def test_the_default_is_a_shop_with_a_daily_ration_of_food(self):
         self.run_main("--new", "-c", "0", "--no-items")
         shop = load_state(self.save).town_hall.shop_buildings[0]
         self.assertEqual(["food"], list(shop.stock))
+        self.assertEqual(main.FOOD_PER_CYCLE, shop.food_per_cycle)
+        self.assertEqual(main.FOOD_PER_CYCLE, shop.stock["food"].quantity)
+
+    def test_the_ration_can_be_chosen(self):
+        self.run_main("--new", "-c", "0", "--no-items", "--food-per-cycle", "500")
+        shop = load_state(self.save).town_hall.shop_buildings[0]
+        self.assertEqual((500, 500), (shop.food_per_cycle, shop.stock["food"].quantity))
+
+    def test_no_ration_means_no_plain_food_at_all(self):
+        self.run_main("--new", "-c", "0", "--no-items", "--food-per-cycle", "0")
+        self.assertEqual({}, load_state(self.save).town_hall.shop_buildings[0].stock)
+
+    def test_unlimited_food_is_still_possible(self):
+        self.run_main("--new", "-c", "0", "--no-items", "--unlimited-food")
+        shop = load_state(self.save).town_hall.shop_buildings[0]
+        self.assertIsNone(shop.food_per_cycle)
         self.assertEqual(math.inf, shop.stock["food"].quantity)
+
+    def test_a_negative_ration_is_refused(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            main.parse_args(["--food-per-cycle", "-5"])
 
     def test_empty_shops_do_not_apply_to_a_town_that_is_resumed(self):
         self.run_main("--new", "-c", "1", "--no-items")

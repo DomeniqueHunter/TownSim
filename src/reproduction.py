@@ -12,13 +12,16 @@ How new sims come into the world (rules from idea.md):
   for every baby that is on its way.
 """
 
+import math
 import random
 
 from person import Person, short_name
 
 
-# chance that two sims who meet (and can mate) really do
-MATE_CHANCE = 0.2
+# chance that two sims who meet (and can mate) really do. Measured on the demo town with no limit by food
+# (1002 sims, 250 cycles): 0.06 and less: the town shrinks, 0.08: it stays as it is, 0.09: it grows to about
+# 2 to 2.6 times as many, slowly, 0.095: 2.7 to 3.4 times, 0.1: it doubles in 150 cycles and speeds up.
+MATE_CHANCE = 0.09
 # the baby is born at the end of the cycle that is this many cycles after the mating
 PREGNANCY_CYCLES = 2
 
@@ -97,7 +100,8 @@ def conceive(town_hall, couples:list, cycle:int, rng=random) -> int:
 
     couples = list(couples)
     rng.shuffle(couples)
-    room = town_hall.free_home_places() - pregnant_count(town_hall)
+    # a town that builds houses for its homeless does not need a free place for every baby
+    room = town_hall.free_home_places() - pregnant_count(town_hall) if town_hall.babies_need_homes else math.inf
 
     pregnancies = 0
     for first, second, phase in couples:

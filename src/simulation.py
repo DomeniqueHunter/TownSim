@@ -1,3 +1,5 @@
+import math
+import random
 import threading
 import time
 from collections import Counter
@@ -9,6 +11,18 @@ from stats import Stats
 
 
 PHASES = list(DayTime)
+
+
+def money_statistics(people) -> dict:
+    """
+    Number, smallest, biggest and average money of the grown ups. Children have none by design, and
+    whoever has unlimited money (Maxima) would make the numbers meaningless, so they are left out.
+    """
+    amounts = [p.money() for p in people if p.is_adult and p.money() != math.inf]
+    if not amounts:
+        return {"count": 0, "min": 0, "max": 0, "avg": 0.0}
+    return {"count": len(amounts), "min": min(amounts), "max": max(amounts),
+            "avg": round(sum(amounts) / len(amounts), 2)}
 
 
 def location_label(location) -> str:
@@ -92,8 +106,16 @@ class Simulation:
             phase = self.phase
             self.town_hall.ledger.day = self.cycle + 1
 
+            # the daily ration of the shops arrives in parts over the day
+            for shop in self.town_hall.shop_buildings:
+                shop.supply(self.phase_index, len(PHASES))
+
+            # in a random order, so that nobody is always first at the shop when the food is short
+            citizens = self.living()
+            random.shuffle(citizens)
+
             relaxing = []
-            for citizen in self.living():
+            for citizen in citizens:
                 if citizen.action(phase) == ActionType.LEISURE:
                     relaxing.append(citizen)
 
@@ -163,16 +185,23 @@ class Simulation:
             if citizen.alive:
                 self.town_hall.integrate_adult(citizen)
 
+        # whoever has no home looks for one, and the town builds a house if there are enough of them
+        self.town_hall.house_homeless()
+        self.town_hall.plan_housing(self.cycle)
+
         died = self.town_hall.graveyard.died_in(self.cycle)
         newcomers = self.town_hall.collect_newcomers()
 
         living = self.living()
+        money = money_statistics(living)
         self.town_hall.ledger.close_day(
             self.cycle,
             alive=len(living),
             food_stock=sum(citizen.food_count() for citizen in living),
             died=len(died),
             new=len(newcomers),
+            homeless=len(self.town_hall.homeless()),
+            money_sims=money["count"], money_min=money["min"], money_max=money["max"], money_avg=money["avg"],
         )
 
         self.town_hall.remove_dead_citizens()
@@ -191,6 +220,7 @@ class Simulation:
             "deaths": self.deaths,
             "food": sum(citizen.food_count() for citizen in living),
             "revenue": sum(shop.revenue for shop in self.town_hall.shop_buildings),
+            "homeless": len(self.town_hall.homeless()),
         }
 
     def census(self) -> Counter:

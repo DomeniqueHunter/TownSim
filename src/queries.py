@@ -6,11 +6,12 @@ numbers, strings) that can be sent as JSON. `run()` is the single entry point,
 it takes the simulation lock so the answer always shows a consistent state.
 """
 
+import math
 import re
 
 from buildings import Unit, HomeBuilding, WorkBuilding, Shop, Brothel, Tile
 from person import ActionType, GENDERS
-from simulation import location_label
+from simulation import location_label, money_statistics
 
 
 class QueryError(Exception):
@@ -261,12 +262,15 @@ def cmd_world(sim, args):
         kinds[kind] = kinds.get(kind, 0) + 1
 
     living = sim.living()
+    homeless = town_hall.homeless()
     return {
         "town": town_hall.town_name,
         "clock": sim.clock(),
         "population": {"alive": len(living), "deaths": sim.deaths,
                        "children": sum(1 for p in living if not p.is_adult),
                        "pregnant": sum(1 for p in living if p.pregnancy is not None),
+                       "homeless": len(homeless),
+                       "homeless_children": sum(1 for p in homeless if not p.is_adult),
                        "genders": {gender: sum(1 for p in living if p.gender == gender) for gender in GENDERS}},
         "last_cycle": sim.last_cycle(),
         "census": dict(sim.census()),
@@ -443,6 +447,34 @@ def cmd_items(sim, args):
     return {"items": entries}
 
 
+def cmd_money(sim, args):
+    """smallest, biggest and average money of the grown ups now, and for each of the last days"""
+    try:
+        days = int(args[0]) if args else 10
+    except ValueError:
+        raise QueryError(f"{args[0]!r} is not a number")
+    days = max(1, min(days, 100))
+
+    living = sim.living()
+    history = []
+    for entry in list(sim.town_hall.ledger.history)[-days:]:
+        sims = entry.get("money_sims", 0)
+        spent = entry.get("money_spent", 0) + entry.get("leisure_spent", 0)
+        history.append({
+            "day": entry["day"], "sims": sims,
+            "min": entry.get("money_min", 0), "max": entry.get("money_max", 0), "avg": entry.get("money_avg", 0.0),
+            "earned_avg": round(entry.get("wages_paid", 0) / sims, 2) if sims else 0.0,
+            "spent_avg": round(spent / sims, 2) if sims else 0.0,
+        })
+
+    return {
+        "now": money_statistics(living),
+        "children": sum(1 for p in living if not p.is_adult),
+        "unlimited": sum(1 for p in living if p.is_adult and p.money() == math.inf),
+        "history": history,
+    }
+
+
 def cmd_map(sim, args):
     town_hall = sim.town_hall
     cells = []
@@ -493,6 +525,7 @@ COMMANDS = {
     "building": cmd_building,
     "goods": cmd_goods,
     "items": cmd_items,
+    "money": cmd_money,
     "map": cmd_map,
     "snapshot": cmd_snapshot,
 }

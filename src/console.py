@@ -11,6 +11,7 @@ Ask a running game things.
     python console.py graveyard              the dead: cycle of death, name, cause (also: graveyard 50 | all)
     python console.py goods 10               food bought/eaten, money spent, wages
     python console.py items                  every item: effects, where it is sold, how many sims hold
+    python console.py money 10               money of the grown ups: min, max, avg now and per day (not Maxima)
     python console.py map Maxima             town map, * marks where she is
     python console.py                        interactive mode
 
@@ -208,6 +209,25 @@ def fmt_items(data:dict) -> str:
     return fmt_table(["id", "name", "category", "effects", "piece", "sold at", "held by sims"], rows)
 
 
+def fmt_money(data:dict) -> str:
+    now = data["now"]
+    left_out = []
+    if data["unlimited"]:
+        left_out.append(f"{data['unlimited']} with unlimited money")
+    if data["children"]:
+        left_out.append(f"{data['children']} children")
+    lines = [f"money of {now['count']} grown ups now" + (f" (not counted: {', '.join(left_out)})" if left_out else ""),
+             f"  min {now['min']}, max {now['max']}, avg {now['avg']:.2f}"]
+    if data["history"]:
+        rows = [[h["day"], h["sims"], h["min"], h["max"], f"{h['avg']:.2f}",
+                 f"{h['earned_avg']:.2f}", f"{h['spent_avg']:.2f}"] for h in data["history"]]
+        lines += ["", f"each of the last {len(rows)} days, at its end (earned and spent: average per grown up that day)",
+                  fmt_table(["day", "grown ups", "min", "max", "avg", "earned", "spent"], rows)]
+    else:
+        lines += ["", "(no finished day yet)"]
+    return "\n".join(lines)
+
+
 def fmt_ledger_line(label:str, counts:dict) -> str:
     return (f"  {label:<10} food bought {counts.get('food_bought', 0)}, eaten {counts.get('food_eaten', 0)}, "
             f"money spent {counts.get('money_spent', 0)}, wages paid {counts.get('wages_paid', 0)}, "
@@ -224,6 +244,7 @@ def fmt_world(data:dict) -> str:
         f"  population: {pop['alive']} alive, {pop['deaths']} died so far",
         f"  children:   {pop['children']} not grown up yet, {pop['pregnant']} pregnant",
         f"  genders:    {', '.join(f'{count} {gender}' for gender, count in pop['genders'].items())}",
+        f"  homeless:   {pop['homeless']} ({pop['homeless_children']} of them children)",
         f"  last cycle: {last['cycle']} ({last['died']} died, {last['new']} new)" if last["cycle"] else
         "  last cycle: none finished yet",
         f"  where:      {census or '-'}",
@@ -301,6 +322,10 @@ def cmd_people(client, args, out):
     out(fmt_people(client.request("people", *args[:2])))
 
 
+def cmd_money(client, args, out):
+    out(fmt_money(client.request("money", *args[:1])))
+
+
 def cmd_graveyard(client, args, out):
     out(fmt_graveyard(client.request("graveyard", *args[:1])))
 
@@ -376,6 +401,7 @@ COMMANDS = {
     "building": (cmd_building, "<name|y,x>  details of a building"),
     "buildings": (cmd_buildings, "all buildings"),
     "people": (cmd_people, "[N] [hunger|money|name|age]  list citizens"),
+    "money": (cmd_money, "[days]  money of the grown ups: min, max, avg now and for each day (not Maxima)"),
     "items": (cmd_items, "all items: what they do, where they are sold, how many sims hold"),
     "graveyard": (cmd_graveyard, "[N|all]  the dead: cycle of death, name, cause (newest first)"),
     "goods": (cmd_goods, "[days]  food bought/eaten, money spent, wages"),

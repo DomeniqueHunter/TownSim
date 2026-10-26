@@ -45,14 +45,16 @@ class Shop(WorkBuilding):
     """
 
     def __init__(self, building_name=None, boss:Person=None, work_places:int=10, food_price:int=5,
-                 default_food:bool=True):
+                 default_food:bool=True, food_per_cycle:int=None):
         WorkBuilding.__init__(self, building_name or "Shop", boss, work_places)
         self.stock = {}                 # item id -> Offer
         self.revenue = 0
         self.sold = 0                   # pieces sold, of everything
+        self.food_per_cycle = food_per_cycle    # None: the plain food never runs out
 
         if default_food:
-            self.stock[BUILTIN_FOOD.id] = Offer(BUILTIN_FOOD.id, food_price, math.inf)
+            quantity = math.inf if food_per_cycle is None else food_per_cycle
+            self.stock[BUILTIN_FOOD.id] = Offer(BUILTIN_FOOD.id, food_price, quantity)
 
     @property
     def food_price(self):
@@ -66,6 +68,23 @@ class Shop(WorkBuilding):
         if offer is None:
             raise ValueError("this shop does not sell the plain food")
         offer.price = price
+
+    def supply(self, phase_index:int, phases:int=10) -> int:
+        """
+        The daily ration of plain food (food_per_cycle) arrives in equal parts over the phases of the day,
+        so every group of sims finds the same on the shelf. The shelf holds one ration at the most (what is not
+        bought goes bad), but stock that was delivered in files above that is left alone.
+        Returns the number of pieces that arrived.
+        """
+        offer = self.stock.get(BUILTIN_FOOD.id)
+        if self.food_per_cycle is None or offer is None:
+            return 0
+
+        ration = self.food_per_cycle
+        arriving = ration * (phase_index + 1) // phases - ration * phase_index // phases
+        if offer.quantity < ration:
+            offer.quantity = min(offer.quantity + arriving, ration)
+        return arriving
 
     def restock(self, item_id:str, price:int, amount:int, portion:int=1) -> Offer:
         """

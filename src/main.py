@@ -22,16 +22,22 @@ ITEMS_DIR = Path(__file__).resolve().parent / "items"
 # town does not grow old and die all at once.
 FOUNDER_MAX_AGE = 89
 
+# plain food the shop gets every cycle (its daily ration): this is what limits the population
+FOOD_PER_CYCLE = 1200
+
 # work places of the brothel (Maxima is its boss and has one of them)
 BROTHEL_PLACES = 40
 
 
-def build_town(default_food:bool=True) -> TownHall:
+def build_town(default_food:bool=True, food_per_cycle:int|None=FOOD_PER_CYCLE) -> TownHall:
     """
     creates a fresh town with its citizens and buildings.
     default_food=False: the shop starts empty, sims starve until items are put into the items folder
+    food_per_cycle: the daily ration of plain food of the shop, None: it never runs out
+    The town grows jobs and builds houses by itself, babies do not need a free place:
+    what limits the population is food.
     """
-    town_hall = TownHall("Small Ville")
+    town_hall = TownHall("Small Ville", grow_jobs=True, build_houses=True, babies_need_homes=False)
 
     maxima = Maxima()
 
@@ -60,7 +66,8 @@ def build_town(default_food:bool=True) -> TownHall:
     town_hall.add_building(Tile("Grass Land", "GL"), (10,0))
 
     factory = WorkBuilding("Small Factory", work_places=600)
-    shop = Shop("Corner Shop", work_places=300, food_price=5, default_food=default_food)
+    shop = Shop("Corner Shop", work_places=300, food_price=5, default_food=default_food,
+                food_per_cycle=food_per_cycle)
     brothel = Brothel("Velvet Room", boss=maxima, work_places=BROTHEL_PLACES, price=10)
     town_hall.add_building(factory)
     town_hall.add_building(shop)
@@ -124,7 +131,10 @@ def run_cycles(sim:Simulation, cycles:int|None, save_path, phase_delay:float=0.0
 
         totals, report = sim.totals(), sim.last_cycle()
         print(f"cycle {sim.cycle}: alive {totals['alive']}, died {report['died']}, new {report['new']}, "
-              f"food {totals['food']}, shop revenue {totals['revenue']}")
+              f"homeless {totals['homeless']}, food {totals['food']}, shop revenue {totals['revenue']}")
+        for news_cycle, text in sim.town_hall.news:
+            if news_cycle == sim.cycle:
+                print(f"  town: {text}")
 
     return days
 
@@ -163,6 +173,11 @@ def parse_args(argv=None):
     parser.add_argument("--empty-shops", action="store_true",
                         help="new town only: the shop starts without food, sims starve until you drop items "
                              "into the items folder")
+    parser.add_argument("--food-per-cycle", type=non_negative_int, default=FOOD_PER_CYCLE, metavar="N",
+                        help=f"new town: pieces of plain food the shop gets every cycle, the population cannot "
+                             f"outgrow this (default: {FOOD_PER_CYCLE}, 0: none, items are the only food)")
+    parser.add_argument("--unlimited-food", action="store_true",
+                        help="new town: the plain food of the shop never runs out, so food limits nothing")
     return parser.parse_args(argv)
 
 
@@ -180,7 +195,8 @@ def main(argv=None) -> int:
         if args.empty_shops:
             print("warning: --empty-shops only counts for a new town, use --new as well", file=sys.stderr)
     else:
-        sim = Simulation(build_town(default_food=not args.empty_shops))
+        ration = None if args.unlimited_food else args.food_per_cycle
+        sim = Simulation(build_town(default_food=not args.empty_shops and ration != 0, food_per_cycle=ration))
         save_state(sim, args.save_file)
         print(f"started a new town, saving to {args.save_file}")
 

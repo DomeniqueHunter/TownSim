@@ -613,10 +613,13 @@ class TestGrowingTown(unittest.TestCase):
         sim = Simulation(town)
 
         alive, births = [], 0
-        for _ in range(cycles):
-            sim.run_cycle()
-            alive.append(len(sim.living()))
-            births += sim.last_cycle()["new"]
+        # these towns are limited by their homes and were measured with the chance of 0.2, which is what
+        # keeps such a town full; the demo town is limited by food and uses a lower one (see reproduction.py)
+        with mock.patch.object(reproduction, "MATE_CHANCE", 0.2):
+            for _ in range(cycles):
+                sim.run_cycle()
+                alive.append(len(sim.living()))
+                births += sim.last_cycle()["new"]
         return sim, alive, births
 
     def test_the_town_survives_for_many_generations(self):

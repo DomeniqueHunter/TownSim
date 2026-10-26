@@ -185,7 +185,7 @@ class TestLogLine(unittest.TestCase):
         self.assertIn("new 0", lines[3])
 
     def test_line_still_has_food_and_revenue(self):
-        self.assertRegex(self.lines(1)[0], r"^cycle 1: alive 5, died 0, new 0, food \d+, shop revenue \d+$")
+        self.assertRegex(self.lines(1)[0], r"^cycle 1: alive 5, died 0, new 0, homeless 0, food \d+, shop revenue \d+$")
 
 
 class TestGraveyardQuery(unittest.TestCase):

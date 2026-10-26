@@ -2,16 +2,41 @@ from buildings import HomeBuilding
 from buildings import WorkBuilding
 from buildings import Shop
 from buildings import Brothel
+from buildings import MegaBuilding
+from collections import deque
+
 from .spiral import SpiralGrid
 from ledger import Ledger
 from graveyard import Graveyard
 from items import Catalog
 
 
-class TownHall:
+# the town builds a new house when this many of its sims have no home (and none is free) ...
+HOMELESS_TO_BUILD = 20
+# ... and the house is ready after this many cycles
+BUILD_CYCLES = 3
+# a new house has this many stories with this many sims per unit, and is free like the first block of the town
+NEW_HOUSE_STORIES = 20
+NEW_HOUSE_PERSONS_PER_UNIT = 5
 
-    def __init__(self, town_name:str):
+
+class TownHall:
+    """
+    `grow_jobs`: a grown up who finds every workplace full makes the biggest one bigger by a place
+    (without it he has no job and no income).
+    `build_houses`: the town builds houses for its homeless (see plan_housing).
+    `babies_need_homes`: a baby can only be made while there is a free place for it to live in
+    (without it babies can be born homeless and wait for a house).
+    """
+
+    def __init__(self, town_name:str, grow_jobs:bool=False, build_houses:bool=False, babies_need_homes:bool=True):
         self.town_name = town_name
+        self.grow_jobs = grow_jobs
+        self.build_houses = build_houses
+        self.babies_need_homes = babies_need_homes
+        self.construction = None        # the house that is being built: {"name": ..., "ready": cycle}
+        self.houses_built = 0
+        self.news = deque(maxlen=100)   # (cycle, text) of what the town did
 
         self.town_grid = SpiralGrid()
         self.address = self.town_grid.add_next_free(self)
@@ -64,6 +89,49 @@ class TownHall:
             citizen.ledger = self.ledger
             citizen.catalog = self.catalog
 
+    def homeless(self) -> list:
+        """the living sims who have no home"""
+        return [citizen for citizen in self.citizens if citizen.alive and citizen.home is None]
+
+    def house_homeless(self) -> int:
+        """gives homes to the homeless where there is room (and they can pay), returns how many found one"""
+        homeless = self.homeless()
+        if not homeless or not any(b.max_residents > b.residents() for b in self.home_buildings):
+            return 0
+
+        homes = self.list_of_buildings()
+        return sum(1 for person in homeless if person.find_place_to_live(homes))
+
+    def plan_housing(self, cycle:int) -> None:
+        """
+        Builds houses for the homeless. When HOMELESS_TO_BUILD sims have no home, even after
+        the free places were given out, a house is built (one at a time). It is ready BUILD_CYCLES
+        cycles later, appears on the next free field of the town and the homeless move in.
+        """
+        if not self.build_houses:
+            return
+
+        if self.construction is not None:
+            if cycle >= self.construction["ready"]:
+                self._finish_house(cycle)
+            return
+
+        homeless = len(self.homeless())
+        if homeless >= HOMELESS_TO_BUILD:
+            name = f"Housing {self.houses_built + 1}"
+            self.construction = {"name": name, "ready": cycle + BUILD_CYCLES}
+            self.news.append((cycle, f"building {name} for {homeless} homeless sims, ready in cycle {cycle + BUILD_CYCLES}"))
+
+    def _finish_house(self, cycle:int) -> None:
+        building = MegaBuilding(self.construction["name"], stories=NEW_HOUSE_STORIES,
+                                persons_per_unit=NEW_HOUSE_PERSONS_PER_UNIT, health=1, stamina=2, hunger=0, money=0)
+        self.add_building(building)
+        self.houses_built += 1
+        self.construction = None
+        moved_in = self.house_homeless()
+        self.news.append((cycle, f"{building.name} is ready: {building.max_residents} places, "
+                                 f"{moved_in} homeless sims moved in"))
+
     def free_home_places(self) -> int:
         """places in homes where a sim without money can live (rent 0)"""
         return sum(b.max_residents - b.residents() for b in self.home_buildings if b.rent() == 0)
@@ -88,6 +156,12 @@ class TownHall:
             return
 
         openings = [b for b in self.work_buildings if b.is_hiring and len(b.employees) < b.work_places]
+        if not openings and self.grow_jobs:
+            hiring = [b for b in self.work_buildings if b.is_hiring]
+            if hiring:                  # everything is full: the biggest workplace grows by a place
+                biggest = max(hiring, key=lambda b: b.work_places)
+                biggest.work_places += 1
+                openings = [biggest]
         for building in sorted(openings, key=lambda b: len(b.employees) / b.work_places):
             if building.employ(person):
                 break
